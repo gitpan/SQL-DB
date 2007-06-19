@@ -1,0 +1,14 @@
+Source: libsql-db-perl
+Section: perl
+Priority: optional
+Build-Depends: debhelper (>= 4.0.2), libmodule-build-perl
+Build-Depends-Indep: perl (>= 5.8.0-7)
+Maintainer: Mark Lawrence <nomad@null.net>
+Standards-Version: 3.6.1
+
+Package: libsql-db-perl
+Architecture: all
+Depends: ${perl:Depends}, ${misc:Depends}
+Description:  SQL::DB - Perl representation of SQL Tables
+ SQL::DB is a Perl class for representing SQL tables and building
+ queries against those tables.
