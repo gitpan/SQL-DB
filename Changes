@@ -1,3 +1,318 @@
+Commit: 011f261861eae7d691705f407aed9def3159e02c 
+Author: Mark Lawrence <nomad@null.net> Wed, 05 Sep 2007 13:42:51 +0200 
+
+    README updates.
+
+Commit: b2b8c4b54ac10be771adb3c3326925bdf641e01a 
+Author: Mark Lawrence <nomad@null.net> Wed, 05 Sep 2007 13:37:44 +0200 
+
+    Added a test to extract and run the SYNOPSIS code.
+
+Commit: d0a72e93800d22b937e91a452375bec782ea3667 
+Author: Mark Lawrence <nomad@null.net> Wed, 05 Sep 2007 13:18:58 +0200 
+
+    The SYNOPSIS from SQL::DB is now a fully working example.
+
+Commit: bdf5b8ddb467544bdf94e2eae653aafc4e83aaca 
+Author: Mark Lawrence <nomad@null.net> Wed, 05 Sep 2007 13:18:19 +0200 
+
+    Fixed "index" to allow just the column name as well as an ARRAY ref.
+
+Commit: d0a6f5870ff8b5e751ff9555b9a4c8ccc7a651d1 
+Author: Mark Lawrence <nomad@null.net> Wed, 05 Sep 2007 13:17:18 +0200 
+
+    Make new() and alias for _new() in SQL::DB::ARow. Not yet decided what
+    the final api should be.
+
+Commit: 379073cc98768bd2fc38df76b6d077099a7791cf 
+Author: Mark Lawrence <nomad@null.net> Wed, 05 Sep 2007 13:16:26 +0200 
+
+    Fixed ASC and DESC to be returned as SQL::DB::Expr objects.
+
+Commit: 51e6cc803244b946695c9c13c5995eb7a474726a 
+Author: Mark Lawrence <nomad@null.net> Wed, 05 Sep 2007 13:13:49 +0200 
+
+    Added "ref" as an alias for "references" when defining columns.
+
+Commit: a473e84314dceffc5c066e0960f97609ad522113 
+Author: Mark Lawrence <nomad@null.net> Wed, 05 Sep 2007 11:12:55 +0200 
+
+    Added "column" definition support (singular version of "columns") to
+    the SQL::DB::Table creation syntax.
+
+Commit: 180cc3d582ea98caf43ea82aa7cd9f64bb4cdc00 
+Author: Mark Lawrence <nomad@null.net> Wed, 05 Sep 2007 10:49:59 +0200 
+
+    t/live updated to test recent changes.
+
+Commit: 9490c507a90a37f1a580d71e63c02625b245c6d1 
+Author: Mark Lawrence <nomad@null.net> Wed, 05 Sep 2007 10:49:04 +0200 
+
+    Added the start of a SQL::DB::Tutorial.
+
+Commit: a05fac56794211c87e845dd9332e60ad3b04845d 
+Author: Mark Lawrence <nomad@null.net> Wed, 05 Sep 2007 10:48:34 +0200 
+
+    Added temporary set() function to SQL::DB::AColumn so that one can
+    write "set => [$arow->acolumn->set($val)]" statements. Considering using
+    the modifiable subroutine lvalue (Experimental) support in perl so that
+    we can write "set => [$arow->acolumn = $val]" instead, which is much
+    more SQL-like.
+
+Commit: 483dcdb6322a38cbcc1bf34f9c5cac154314d026 
+Author: Mark Lawrence <nomad@null.net> Wed, 05 Sep 2007 10:39:06 +0200 
+
+    SQL::DB::Expr: New Expressions: <=, >=, +
+
+Commit: 7a2308396da2a587eb7683d8185dedfdbb95f492 
+Author: Mark Lawrence <nomad@null.net> Wed, 05 Sep 2007 10:36:39 +0200 
+
+    Minor documentation edits to SQL::DB::Schema.
+
+Commit: f08e45dda5356e4afa8352ed1cc4edbb50c91e3a 
+Author: Mark Lawrence <nomad@null.net> Wed, 05 Sep 2007 10:35:27 +0200 
+
+    SQL::DB::Object: Fixes to "columns changed?" related methods.
+
+Commit: 8ab138d050aa899b369fa837fc0a17426378d79a 
+Author: Mark Lawrence <nomad@null.net> Wed, 05 Sep 2007 10:33:22 +0200 
+
+    Added SQL::DB::Query->wantobjects, ->arows, "selecto" methods.
+
+Commit: 96ab59b7dce96fd0fca7bfab8273d03fcee22fe3 
+Author: Mark Lawrence <nomad@null.net> Wed, 05 Sep 2007 10:28:53 +0200 
+
+    Major API change and cleanup of DB.pm
+     * Objects now created with new()
+     * New methods: define(), connect_cached(), qcount(), fetch()
+     * Removed: do_query(), so()
+     * Removed Tutorial - will go into new SQL::DB::Tutorial.pod
+     * Documentation matches code.
+
+Commit: 7258a65796db7c15ff566f4fd367e17540ecb8ef 
+Author: Mark Lawrence <nomad@null.net> Wed, 22 Aug 2007 19:02:04 +0200 
+
+    Added method SQL::DB::Table->primary_column_names()
+
+Commit: f60a61b53ff54dd1f118d1944fd14df429a24ca1 
+Author: Mark Lawrence <nomad@null.net> Tue, 21 Aug 2007 17:03:55 +0200 
+
+    Added 'bases' (inherit from class) support to SQL::DB::Table
+
+Commit: 12db827f6ea8843c8bb6dacdcc52401c3c3d3eb3 
+Author: Mark Lawrence <nomad@null.net> Tue, 21 Aug 2007 11:36:29 +0200 
+
+    Tests & Cleanups
+
+Commit: d4179cd7ff8e466e8defcd8719861b300e28c9fc 
+Author: Mark Lawrence <nomad@null.net> Mon, 20 Aug 2007 23:41:54 +0200 
+
+    Removed old t/02-abstract.t
+
+Commit: 2dfe862c919b7bdb0d95afae3427cebabe3ee176 
+Author: Mark Lawrence <nomad@null.net> Mon, 20 Aug 2007 23:00:45 +0200 
+
+    New Schema for tests.
+
+Commit: 47ce13fc4969ec12ad5728509040ebfc3c870188 
+Author: Mark Lawrence <nomad@null.net> Mon, 20 Aug 2007 22:59:20 +0200 
+
+    Removed old t/Column.t
+
+Commit: ebc942ba1bddee2810ab3823051038aed8ab655c 
+Author: Mark Lawrence <nomad@null.net> Mon, 20 Aug 2007 22:55:00 +0200 
+
+    Added test for SQL::DB::Table
+
+Commit: 9774e98a7f15546f8392ec6eb2f0799a27beaf5d 
+Author: Mark Lawrence <nomad@null.net> Mon, 20 Aug 2007 22:33:47 +0200 
+
+    Added test for SQL::DB::Column
+
+Commit: f1ba432caee86da98aafe9cecf626b09d8a667d6 
+Author: Mark Lawrence <nomad@null.net> Sun, 19 Aug 2007 23:37:03 +0200 
+
+    Big simplification and cleanup of SQL::DB::AColumn. SQL::DB::AColumn::Func
+    has been removed as the func() method now clones and returns a new AColumn.
+
+Commit: 548d34cd429a35ed6a9f87ac5cfd8a96897f9752 
+Author: Mark Lawrence <nomad@null.net> Sun, 19 Aug 2007 23:35:25 +0200 
+
+    Added q_delete to SQL::DB::Object.
+
+Commit: b35ed20f6514909de86a8d1067fe92ae798f9dbb 
+Author: Mark Lawrence <nomad@null.net> Sun, 19 Aug 2007 23:34:51 +0200 
+
+    Minor cleanups to SQL::DB::Query
+
+Commit: 0c185ee934a41f166c133417f0bb35b8a0842037 
+Author: Mark Lawrence <nomad@null.net> Sun, 19 Aug 2007 11:09:15 +0200 
+
+    Can no longer call SQL::DB::Schema->arow. User code must now call
+    Class->arow, or Class::Abstract->new directly.
+
+Commit: cf84b62b77e4033bacdf0886fb5bdc67f13ccbf8 
+Author: Mark Lawrence <nomad@null.net> Sun, 19 Aug 2007 11:07:32 +0200 
+
+    SQL::DB::ARow is no longer responsible for creating the Abstract classes -
+    this is now handled by SQL::DB::Table.
+    Also includes a simplification - Removed all 'reference' code.
+
+Commit: 8c254779201404d12e9f44afce6d419628db3f7a 
+Author: Mark Lawrence <nomad@null.net> Sun, 19 Aug 2007 11:06:07 +0200 
+
+    SQL::DB::Table now automatically creates the Class, and the Abstract Class
+    for each table.
+
+Commit: d24d6cc202ca4e911ce7532f732c3e5a97f0fd18 
+Author: Mark Lawrence <nomad@null.net> Sun, 19 Aug 2007 11:03:58 +0200 
+
+    Cleanup and simplification of functions in SQL::DB::Column.
+
+Commit: d70c4bff4d80dc269c59cb0b1faa39099bfb9dfc 
+Author: Mark Lawrence <nomad@null.net> Sun, 19 Aug 2007 11:01:43 +0200 
+
+    Removed inc/Module/Install from git/cogito control.
+
+Commit: df8970faa8b913035c3353f2f28164c5f776b687 
+Author: Mark Lawrence <nomad@null.net> Sat, 18 Aug 2007 20:32:52 +0200 
+
+    Cleanup and Documentation for SQL::DB::Table
+
+Commit: cb014d11455950c14c391b449546386ee04b307a 
+Author: Mark Lawrence <nomad@null.net> Sat, 18 Aug 2007 17:51:52 +0200 
+
+    Turned SQL::DB::Column->references() into a lazy inflation function. This
+    means we don't care about the order in which tables are defined, although
+    it is still important because the database (eg PostgreSQL) still cares.
+
+Commit: fba17d2a2364e49f874e3e233d3a523940b40c65 
+Author: Mark Lawrence <nomad@null.net> Sat, 18 Aug 2007 17:46:40 +0200 
+
+    Less verbose debugging in SQL::DB::ARow
+
+Commit: 29973dbca9bfda6232de6d36b75e798f0bc06138 
+Author: Mark Lawrence <nomad@null.net> Sat, 18 Aug 2007 17:37:41 +0200 
+
+    Added basic AS support to SQL::DB::AColumn
+
+Commit: f99f286dc7554b2d132042300b34ccd4964c4eff 
+Author: Mark Lawrence <nomad@null.net> Sat, 18 Aug 2007 17:08:54 +0200 
+
+    SQL::DB::Schema now has only query() method. select(), update() etc are
+    gone.
+
+Commit: ddc54037393f5ada7beeffc2e60f3d13bf4c815e 
+Author: Mark Lawrence <nomad@null.net> Sat, 18 Aug 2007 17:08:02 +0200 
+
+    Added not equals '!=' expression type to SQL::DB::Expr.
+
+Commit: de5034cbb93d4e6591aed5fadd79f58a9ddfaebb 
+Author: Mark Lawrence <nomad@null.net> Sat, 18 Aug 2007 17:01:05 +0200 
+
+    Folded SQL::DB::Query::* into SQL::DB::Query. SQL::DB has basic support for
+    retrieving on-demand objects and SQL::DB::Object-based objects.
+
+Commit: f4685ed0b44928b1ff6fbb8e88720e00981a6bc2 
+Author: Mark Lawrence <nomad@null.net> Sat, 18 Aug 2007 16:50:29 +0200 
+
+    SQL::DB::Table now creates object classes based on SQL::DB::Object.
+
+Commit: 4a79e6c2ffeb6f8e6f07bdfebdb60dab77df3ed3 
+Author: Mark Lawrence <nomad@null.net> Sat, 18 Aug 2007 16:49:27 +0200 
+
+    Added new SQL::DB::Object class.
+
+Commit: f6e3b2f5136537d232e86d13b4b4fd8e3a803e47 
+Author: Mark Lawrence <nomad@null.net> Tue, 26 Jun 2007 15:10:07 +0200 
+
+    * Added Fans (of which an Artist has many) Link-table to the test schema
+    * Added hard dependency on DBI
+
+Commit: 40e77ac1ec09887be04509ad2ebef45c7f0d81b5 
+Author: Mark Lawrence <nomad@null.net> Fri, 22 Jun 2007 01:59:29 +0200 
+
+    * Properly implement ->func: now works for multiple function calls on
+    the same column.
+    * Removed one "weaken" too many in ARow.pm.
+
+Commit: 25bc634ba5847284998f1cd9cc6cfa97017dc62a 
+Author: Mark Lawrence <nomad@null.net> Thu, 21 Jun 2007 10:58:17 +0200 
+
+    Added GROUP BY support.
+
+Commit: 38c5a95ca67ccd5179425a8f6d820359df3525a1 
+Author: Mark Lawrence <nomad@null.net> Wed, 20 Jun 2007 14:47:53 +0200 
+
+    Converted SQL::DB::sth_to_simple_objects from Class::Struct =>
+    Class::Accessor::Fast. Removed dependency on Class::Struct.
+
+Commit: ba606fbbb6acf8db66ba47f2b2ed48e5f482ffc4 
+Author: Mark Lawrence <nomad@null.net> Wed, 20 Jun 2007 13:59:17 +0200 
+
+    Converted SQL::DB::Column from Class::Struct to Class::Accessor::Fast
+    New dependency on Class::Accessor
+
+Commit: 593ba883145ce1cf4bd429041b9679f14f43c0e6 
+Author: Mark Lawrence <nomad@null.net> Wed, 20 Jun 2007 13:16:41 +0200 
+
+    * Support for multiple 'unique' or 'index' statements in table definition.
+    This makes the schema definition syntax much cleaner as it does away with
+    some of the array refs.
+    * Fixed a PRIMARY KEY bug in CREATE TABLE statements.
+
+Commit: 77651e8b419f067feabdc4692ed056b184e70f29 
+Author: Mark Lawrence <nomad@null.net> Wed, 20 Jun 2007 13:13:32 +0200 
+
+    Test Schema: Moved table unique and index command to be multiple ARRAYREFs
+
+Commit: 61c1a014cdc150e0dfc61ca8542199704d3d645f 
+Author: Mark Lawrence <nomad@null.net> Wed, 20 Jun 2007 00:25:19 +0200 
+
+    Added brackets to UNION statements
+
+Commit: 799bf0fbd52d92b4efbd2f9e80d23c0c2af504a5 
+Author: Mark Lawrence <nomad@null.net> Tue, 19 Jun 2007 23:33:26 +0200 
+
+    Support for arbitrary database functions (count, max, min, etc)
+
+Commit: 7638cfb9b0e9f1d26925bcfe74538233aa72ab31 
+Author: Mark Lawrence <nomad@null.net> Tue, 19 Jun 2007 21:26:39 +0200 
+
+    Fixed a rather broken SQL::DB->schema method.
+
+Commit: d723d3798029834d6642ab9b98d36beff3f784c0 
+Author: Mark Lawrence <nomad@null.net> Tue, 19 Jun 2007 20:48:09 +0200 
+
+    Module::Install::Build no longer necessary and removed.
+
+Commit: 7fb60ce1932cdf7cd0fa1cacc16460dc74e3cf3a 
+Author: Mark Lawrence <nomad@null.net> Tue, 19 Jun 2007 20:22:24 +0200 
+
+    SELECT UNION Support.
+
+Commit: 60cff74c7679104eb4ed73967c71a85e372cd05f 
+Author: Mark Lawrence <nomad@null.net> Tue, 19 Jun 2007 19:04:33 +0200 
+
+    Added vim defaults to every module: # vim: set tabstop=4 expandtab:
+
+Commit: a6f49bf880862def54c6b3ef0faf96af7299663a 
+Author: Mark Lawrence <nomad@null.net> Tue, 19 Jun 2007 18:16:18 +0200 
+
+    Column.pm: Make Class::Struct class definition at compile time.
+
+Commit: b5161ad74522bb17481f39c827fe744fd94293a0 
+Author: Mark Lawrence <nomad@null.net> Tue, 19 Jun 2007 18:05:00 +0200 
+
+    Change references to SQL::Builder => SQL::Abstract since Builder is almost
+    invisible - ie not on CPAN.
+
+Commit: ab78471a6657bbbadf71d6992a132a58da6e46bf 
+Author: Mark Lawrence <nomad@null.net> Tue, 19 Jun 2007 17:58:15 +0200 
+
+    * Removed META.yml from git/cogito control
+    * Added t/live.t that uses a real database. First working example.
+
 Commit: 62fd440d223a3e561d74f88cea43810468d7c8d6 
 Author: Mark Lawrence <nomad@null.net> Tue, 19 Jun 2007 17:07:38 +0200 
 

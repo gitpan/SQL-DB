@@ -2,20 +2,17 @@ package SQL::DB::Schema;
 use 5.008;
 use strict;
 use warnings;
-use Carp qw(carp croak);
+use Carp qw(carp croak confess);
 
 use SQL::DB::Table;
+use SQL::DB::Query;
 
-use SQL::DB::Query::Insert;
-use SQL::DB::Query::Select;
-use SQL::DB::Query::Update;
-use SQL::DB::Query::Delete;
-
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 our $DEBUG;
 
 use Data::Dumper;
 $Data::Dumper::Indent = 1;
+
 
 sub new {
     my $proto = shift;
@@ -25,7 +22,6 @@ sub new {
         table_names => {},
     };
     bless($self,$class);
-
 
     foreach (@_) {
         unless (ref($_) and ref($_) eq 'ARRAY') {
@@ -39,21 +35,21 @@ sub new {
 
 sub define {
     my $self = shift;
-    my $def  = shift;
 
-    unless (ref($def) and ref($def) eq 'ARRAY') {
-        croak 'usage: define($arrayref)';
+    foreach my $def (@_) {
+        unless (ref($def) and ref($def) eq 'ARRAY') {
+            croak 'usage: define($arrayref,...)';
+        }
+
+        my $table = SQL::DB::Table->new(schema => $self, @{$def});
+
+        if (exists($self->{table_names}->{$table->name})) {
+            croak "Table ". $table->name ." already defined";
+        }
+
+        push(@{$self->{tables}}, $table);
+        $self->{table_names}->{$table->name} = $table;
     }
-
-    my $table = SQL::DB::Table->new($def, $self);
-
-    if (exists($self->{table_names}->{$table->name})) {
-        croak "Table ". $table->name ." already defined";
-    }
-
-    push(@{$self->{tables}}, $table);
-    $self->{table_names}->{$table->name} = $table;
-
     return;
 }
 
@@ -64,11 +60,11 @@ sub table {
 
     if ($name) {
         if (!exists($self->{table_names}->{$name})) {
-            croak "Table '$name' has not been defined";
+            confess "Table '$name' has not been defined";
         }
         return $self->{table_names}->{$name};
     }
-    croak 'usage: table($name)';
+    confess 'usage: table($name)';
 }
 
 
@@ -80,86 +76,96 @@ sub tables {
 }
 
 
-sub arow {
+sub query {
     my $self = shift;
-    my $name = shift;
-    if (!$name) {
-        croak 'usage: arow($name)';
-    }
-    if (!exists($self->{table_names}->{$name})) {
-        croak "Table '$name' has not been defined";
-    }
-    
-    return $self->{table_names}->{$name}->abstract_row;
+    return SQL::DB::Query->new(@_);
 }
-
-
-sub insert {
-    my $self = shift;
-    return SQL::DB::Query::Insert->new(@_);
-}
-
-sub select {
-    my $self = shift;
-    return SQL::DB::Query::Select->new(@_);
-}
-
-sub update {
-    my $self = shift;
-    return SQL::DB::Query::Update->new(@_);
-}
-
-sub delete {
-    my $self = shift;
-    return SQL::DB::Query::Delete->new(@_);
-}
-
 
 1;
 __END__
 
 =head1 NAME
 
-SQL::DB::Schema - Create SQL statements using Perl logic and objects
+SQL::DB::Schema - Generate SQL using Perl logic and objects
 
-=head1 STATUS
+=head1 VERSION
 
-This module is brand new and should not yet be used in production.
-However please feel free to give it a workout and let me know what
-doesn't work.
+0.04. Development release.
 
 =head1 SYNOPSIS
 
   use SQL::DB::Schema;
+  use DBI;
+
+  my $dbh = DBI->connect("dbi:SQLite:/tmp/sqlite$$.db");
 
   my $schema = SQL::DB::Schema->new(
-    'Artists' => [
+    [
+        table => 'artists',
+        class => 'Artist',
         columns => [
-            [name => 'id', primary => 1],
-            [name => 'name',unique => 1],
+            [name => 'id',  type => 'INTEGER', primary => 1],
+            [name => 'name',type => 'VARCHAR(255)',unique => 1],
+        ],
+        unique => 'name',
+        index  => [
+            columns => 'name',
+            unique  => 1,
         ],
     ],
-    'CDs' => [
+    [
+        table => 'cds',
+        class => 'CD',
         columns => [
-            [name => 'id', primary => 1],
-            [name => 'title'],
-            [name => 'year'],
-            [name => 'artist', references => 'Artists(id)']
+            [name => 'id', type => 'INTEGER', primary => 1],
+            [name => 'title', type => 'VARCHAR(255)'],
+            [name => 'year', type => 'INTEGER'],
+            [name => 'artist', type => 'INTEGER', references => 'artists(id)'],
+        ],
+        unique  => 'title,artist',
+        index   => [
+            columns => 'title',
+        ],
+        index  => [
+            columns => 'artist',
         ],
     ],
-    'Tracks' => [
-        columns => [
-            [name => 'id', primary => 1],
-            [name => 'length'],
-            [name => 'cd', references => 'CDs(id)'],
-        ],
-        unique => [['length,cd']],
-     ],
   );
 
-  print join("\n\n",$schema->table),"\n\n";
 
-  my $track = $schema->arow('Tracks');
+  foreach my $t ($schema->tables) {
+    $dbh->do($t->sql);
+    foreach my $index ($t->sql_index) {
+        $dbh->do($index);
+    }
+  }
+
+  # CREATE TABLE artists (
+  #     id              INTEGER        NOT NULL,
+  #     name            VARCHAR(255)   NOT NULL UNIQUE,
+  #     PRIMARY KEY(id),
+  #     UNIQUE (name)
+  # )
+  # CREATE TABLE cds (
+  #     id              INTEGER        NOT NULL,
+  #     title           VARCHAR(255)   NOT NULL,
+  #     year            INTEGER        NOT NULL,
+  #     artist          INTEGER        NOT NULL REFERENCES artists(id),
+  #     PRIMARY KEY(id),
+  #     UNIQUE (title, artist)
+  # )
+  # CREATE INDEX cds_title ON cds (title)
+  # CREATE INDEX cds_artist ON cds (artist)
+
+  my $artist = Artist->arow; # or Artist::Abstract->new;
+  my $cd     = CD->arow;     # or CD::Abstract->new;
+
+  my $query  = $schema->query(
+    insert => [$artist->id, $artist->name],
+    values => [1, 'Queen'],
+  );
+
+  $dbh->do($query->sql, undef, $query->bind_values);
 
   my $query = $schema->select(
       columns  => [ $track->cd->title, $track->cd->artist->name ],
@@ -185,9 +191,8 @@ combination of Perl objects, methods and logic operators such as '!',
 category as L<SQL::Builder> and L<SQL::Abstract> but with extra
 abilities.
 
-As B<SQL::DB::Schema> makes use of foreign key information, powerful
-queries can be created with minimal effort, requiring fewer statements
-than if you were to write the SQL yourself.
+B<SQL::DB::Schema> doesn't actually do much of the work itself, but
+glues together various other SQL::DB::* modules.
 
 Because B<SQL::DB::Schema> is very simple it will create what it is asked
 to without knowing or caring if the statements are suitable for the
@@ -198,7 +203,7 @@ own layer above B<SQL::DB::Schema> for that purpose.
 You probably don't want to B<SQL::DB::Schema> directly unless you
 are writing an Object Mapping Layer or need to produce SQL offline.
 If you need to talk to a real database you are much better off
-using something like L<SQL::DB>.
+interfacing with L<SQL::DB>.
 
 =head1 METHODS
 
@@ -414,3 +419,4 @@ the Free Software Foundation; either version 2 of the License, or
 
 =cut
 
+# vim: set tabstop=4 expandtab:

@@ -1,21 +1,20 @@
 package SQL::DB::Column;
 use strict;
-use Class::Struct 'SQL::DB::Column' => {
-    table          => 'SQL::DB::Table',
-    name           => '$',
-    primary        => '$',
-    type           => '$',
-    null           => '$',
-    default        => '$',
-    unique         => '$',
-    auto_increment => '$',
-    references     => 'SQL::DB::Column',
-};    
-
 use warnings;
+use base qw(Class::Accessor::Fast);
 use Carp qw(carp croak);
 use Scalar::Util qw(weaken);
-use overload '""' => 'as_string', fallback => 1;
+
+SQL::DB::Column->mk_accessors(qw(
+    table
+    name
+    type
+    null
+    default
+    unique
+    auto_increment
+));
+
 
 our $DEBUG;
 
@@ -24,58 +23,86 @@ sub table {
     my $self = shift;
     if ( @_ ) {
         my $table = shift;
-        unless(ref($table) and ref($table) eq 'SQL::DB::Table') {
+        unless(CORE::ref($table) and CORE::ref($table) eq 'SQL::DB::Table') {
             croak "table must be a SQL::DB::Table";
         }
-        $self->{'SQL::DB::Column::table'} = $table;
-        weaken($self->{'SQL::DB::Column::table'});
+        $self->{table} = $table;
+        weaken($self->{table});
     }
-    return $self->{'SQL::DB::Column::table'};
+    return $self->{table};
 }
 
 
+sub primary {
+    my $self = shift;
+    if (@_) {
+        if ($self->{primary} = shift) {
+            $self->{table}->add_primary($self);
+        }
+    }
+    else {
+        return $self->{primary};
+    }
+}
+
+
+#
+# This is a delayed value function. Takes a string, but first time
+# is accessed it finds the real column and sets itself to that column.
+#
+sub ref {references(@_);};
 sub references {
     my $self = shift;
-    if ( @_ ) {
-        my $col = shift;
-        unless(ref($col) and ref($col) eq 'SQL::DB::Column') {
-            croak "reference must be a SQL::DB::Column";
-        }
-        $self->{'SQL::DB::Column::references'} = $col;
-        weaken($self->{'SQL::DB::Column::references'});
+    # Set a value
+    if (@_) {
+        $self->{references} = shift;
+        return;
     }
-    return $self->{'SQL::DB::Column::references'};
+
+    # Not set
+    if (!$self->{references}) {
+        return;
+    }
+
+    # Already accessed - return the reference to SQL::DB::Column
+    if (CORE::ref($self->{references})) {
+        return $self->{references};
+    }
+
+    # Not yet accessed - find the reference to SQL::DB::Column
+    my @cols = $self->table->text2cols($self->{references});
+    $self->{references} = $cols[0];
+    weaken($self->{references});
+#   $col->table->has_many($self);
+    return $self->{references};
 }
 
+
+sub sql_default {
+    my $self = shift;
+    my $default = $self->default;
+    if (!defined($default)) {
+        return '';
+    }
+
+    if ($self->type =~ m/(int)|(real)|(float)|(double)|(numeric)/i) {
+        return ' DEFAULT ' . $default
+    }
+    return " DEFAULT '" . $default ."'";
+}
 
 sub sql {
     my $self = shift;
     return sprintf('%-15s %-15s', $self->name, $self->type)
            . ($self->null ? 'NULL' : 'NOT NULL')
-           . (defined($self->default) ? ' DEFAULT '
-               . (defined($self->default) ? '?' : 'NULL') : '')
+           . $self->sql_default
            . ($self->auto_increment ? ' AUTO_INCREMENT' : '')
            . ($self->unique ? ' UNIQUE' : '')
-           . ($self->primary ? ' PRIMARY' : '')
+#           . ($self->primary ? ' PRIMARY KEY' : '')
            . ($self->references ? ' REFERENCES '
                . $self->references->table->name .'('
                . $self->references->name .')' : '')
     ;
-}
-
-
-sub bind_values {
-    my $self = shift;
-    if ($self->default) {
-        return ($self->default);
-    }
-    return;
-}
-
-
-sub as_string {
-    my $self = shift;
-    return $self->table->name .'.'. $self->name;
 }
 
 
@@ -86,3 +113,4 @@ DESTROY {
 
 1;
 __END__
+# vim: set tabstop=4 expandtab:

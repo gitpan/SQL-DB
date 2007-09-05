@@ -5,56 +5,6 @@ use base qw(SQL::DB::Expr);
 use Carp qw(carp croak confess);
 use Scalar::Util qw(weaken);
 
-my $ABSTRACT = 'SQL::DB::Abstract::';
-
-sub _define {
-    shift;
-    my $col = shift;
-
-    no strict 'refs';
-
-    my $pkg = $ABSTRACT . $col->table->name .'::'. $col->name;
-    my $isa = \@{$pkg . '::ISA'};
-    if (defined @{$isa}) {
-        carp "redefining $pkg";
-    }
-
-    push(@{$isa}, 'SQL::DB::AColumn');
-
-    warn $pkg if($main::DEBUG);
-
-    if ($col->references) {
-        my $t = $col->references->name;
-
-        foreach my $fcol ($col->references->table->columns, '_columns') {
-            my $fcolname;
-            if (ref($fcol)) {
-                $fcolname = $fcol->name;
-            }
-            else {
-                $fcolname = $fcol;
-            }
-
-            my $sym = $pkg .'::'. $fcolname;
-            *{$sym} = sub {
-                my $self = shift;
-                if (!$self->{reference}) {
-                    my $foreign_row = SQL::DB::ARow->_new(
-                        $col->references->table,
-                        $self
-                    );
-                    $self->{reference} = $foreign_row;
-                    $self->{arow}->_references(
-                        [$foreign_row, ($self == $foreign_row->$t)]
-                    );
-                }
-                return $self->{reference}->$fcolname;
-            };
-            warn $sym if($main::DEBUG);
-        }
-    }
-}
-
 
 sub _new {
     my $proto = shift;
@@ -65,21 +15,17 @@ sub _new {
     my $arow  = shift;
     $self->{col}  = $col;  # column definition SQL::DB::AColumn
     $self->{arow} = $arow; # abstract representation of a table row
-    weaken($self->{arow});
 
-    #
-    # The first time this is called we need to define the package
-    #
-    my $pkg   = $ABSTRACT . $col->table->name .'::'. $col->name;
-    my $isa   = $pkg .'::ISA';
+#    weaken($self->{arow}); FIXME or cleanup and remove all weak stuff.
 
-    if (!defined @{$isa}) {
-        __PACKAGE__->_define($col);
-    }
-
-    bless($self, $pkg);
-
+    bless($self, $class);
     return $self;
+}
+
+
+sub clone {
+    my $self = shift;
+    my $new  = $self->_new($self->{col}, $self->{arow});
 }
 
 
@@ -91,6 +37,7 @@ sub _column {
 
 sub _name {
     my $self = shift;
+    return $self->{_as} if($self->{_as});
     return $self->{col}->name;
 }
 
@@ -98,6 +45,13 @@ sub _name {
 sub _arow {
     my $self = shift;
     return $self->{arow};
+}
+
+
+sub as {
+    my $self = shift;
+    $self->{_as} = shift if(@_);
+    return $self;
 }
 
 
@@ -125,20 +79,46 @@ sub expr_not {
 
 sub asc {
     my $self = shift;
-    return $self->sql . ' ASC';
+    return SQL::DB::Expr->new($self->sql . ' ASC');
 }
 
 
 sub desc {
     my $self = shift;
-    return $self->sql . ' DESC';
+    return SQL::DB::Expr->new($self->sql . ' DESC');
 }
 
 
-#sub count {
-#    my $self = shift;
-#    return 'COUNT(' .$self->sql . ')';
-#}
+sub func {
+    my $self = shift;
+    my $new  = $self->clone;
+    $new->{_func} = shift;
+    $new->{_as} = $new->{_func} .'_'. $new->_name;
+    return $new;
+}
+
+
+use UNIVERSAL;
+sub set {
+    my $self = shift;
+    if (@_) {
+        my $set = shift;
+        my $expr;
+        if (UNIVERSAL::isa($set, 'SQL::DB::Expr')) {
+            return SQL::DB::Expr->new($self->{col}->name .' = '. $set->sql,
+                                      $set->bind_values);
+        }
+        return SQL::DB::Expr->new($self->{col}->name .' = ?', $set);
+    }
+    confess "set() is write-only";
+#    return $self->{set};
+#    my $val  = shift;
+#    if (ref($val) and $val->isa('SQL::DB::Expr')) {
+#        return SQL::DB::Expr->new($self .' = '. $val, $val->bind_values);
+#    }
+#    my $newexpr =  SQL::DB::Expr->new($self .' = ?', $val);
+#    return $newexpr;
+}
 
 
 sub sql {
@@ -147,11 +127,27 @@ sub sql {
 }
 
 
+sub sql_select {
+    my $self = shift;
+    if ($self->{_func}) {
+        return uc($self->{_func}) .'('. $self->{arow}->_alias 
+               .'.'. $self->{col}->name .')'
+               .' AS '. $self->{_as};
+    }
+    if ($self->{_as}) {
+        return $self->{arow}->_alias .'.'. $self->{col}->name
+               .' AS '. $self->{_as};
+    }
+    return $self->{arow}->_alias .'.'. $self->{col}->name;
+} 
+
+
 DESTROY {
     my $self = shift;
-    warn "DESTROY $self" if($main::DEBUG);
+    warn "DESTROY $self" if($SQL::DB::DEBUG && $SQL::DB::DEBUG>3);
 }
 
 
 1;
 __END__
+# vim: set tabstop=4 expandtab:

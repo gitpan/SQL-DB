@@ -1,4 +1,4 @@
-abstract: ~
+abstract: Perl interface to SQL Databases
 author: 'Mark Lawrence <nomad@null.net>'
 build_requires:
   Test::More: 0
@@ -11,7 +11,8 @@ no_index:
     - inc
     - t
 requires:
-  Class::Struct: 0
+  Class::Accessor::Fast: 0
+  DBI: 0
   Scalar::Util: 0
-  perl: 5.8.0
-version: 0.02
+  perl: 5.6.0
+version: 0.04

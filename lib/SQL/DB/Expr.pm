@@ -6,11 +6,17 @@ use Carp;
 use overload
     '""' => 'sql',
     '!' => 'expr_not',
+    'ne' => 'expr_ne',
+    '!=' => 'expr_ne',
+    'eq' => 'expr_eq',
     '==' => 'expr_eq',
     '&' => 'expr_and',
     '|' => 'expr_or',
     '<' => 'expr_lt',
     '>' => 'expr_gt',
+    '<=' => 'expr_lte',
+    '>=' => 'expr_gte',
+    '+' => 'expr_plus',
     fallback => 1,
 ;
 
@@ -58,6 +64,16 @@ sub expr_eq {
 }
 
 
+sub expr_ne {
+    my $expr = shift;
+    my $val  = shift;
+    if (ref($val) and $val->isa(__PACKAGE__)) {
+        return __PACKAGE__->new($expr .' != '. $val, $expr->bind_values);
+    }
+    return __PACKAGE__->new($expr .' != ?', $val);
+}
+
+
 sub expr_lt {
     my $expr = shift;
     my $val  = shift;
@@ -65,6 +81,17 @@ sub expr_lt {
         return __PACKAGE__->new($expr .' < '. $val, $expr->bind_values);
     }
     my $newexpr =  __PACKAGE__->new($expr .' < ?', $val);
+    $newexpr->multi(1);
+    return $newexpr;
+}
+
+sub expr_lte {
+    my $expr = shift;
+    my $val  = shift;
+    if (ref($val) and $val->isa(__PACKAGE__)) {
+        return __PACKAGE__->new($expr .' <= '. $val, $expr->bind_values);
+    }
+    my $newexpr =  __PACKAGE__->new($expr .' <= ?', $val);
     $newexpr->multi(1);
     return $newexpr;
 }
@@ -78,6 +105,30 @@ sub expr_gt {
     }
     my $newexpr =  __PACKAGE__->new($expr .' > ?', $val);
     $newexpr->multi(1);
+    return $newexpr;
+}
+
+
+sub expr_gte {
+    my $expr = shift;
+    my $val  = shift;
+    if (ref($val) and $val->isa(__PACKAGE__)) {
+        return __PACKAGE__->new($expr .' >= '. $val, $expr->bind_values);
+    }
+    my $newexpr =  __PACKAGE__->new($expr .' >= ?', $val);
+    $newexpr->multi(1);
+    return $newexpr;
+}
+
+
+sub expr_plus {
+    my $expr = shift;
+    my $val  = shift;
+#    if (ref($val) and $val->isa(__PACKAGE__)) {
+#        return __PACKAGE__->new($expr .' = '.$expr $val, $expr->bind_values);
+#    }
+    my $newexpr =  __PACKAGE__->new($expr .' + '. $val);
+#    $newexpr->multi(1);
     return $newexpr;
 }
 
@@ -181,3 +232,4 @@ sub sql {
 
 1;
 __END__
+# vim: set tabstop=4 expandtab:
