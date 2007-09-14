@@ -1,7 +1,7 @@
 package SQL::DB::Table;
 use strict;
 use warnings;
-use overload '""' => 'sql';
+use overload '""' => 'sql_create';
 use Carp qw(carp croak confess);
 use Scalar::Util qw(weaken);
 use SQL::DB::Column;
@@ -25,7 +25,7 @@ my @reserved = qw(
 sub new {
     my $proto = shift;
     my $class = ref($proto) || $proto;
-    my $self  = {};
+    my $self  = {columns => []};
     bless($self, $class);
 
     while (my ($key,$val) = splice(@_, 0, 2)) {
@@ -53,7 +53,7 @@ sub new {
 
         my @bases = $self->{bases} ? @{$self->{bases}} : ('SQL::DB::Object');
         push(@{$isa}, @bases);
-        $class->mk_accessors($self->column_names);
+        $class->mk_accessors($self->column_names_ordered);
         ${$class .'::TABLE'} = $self;
 
         my $aclass = $class . '::Abstract';
@@ -62,8 +62,15 @@ sub new {
             carp "redefining $aclass";
         }
         push(@{$isa}, 'SQL::DB::ARow');
-        $aclass->mk_accessors($self->column_names);
+        $aclass->mk_accessors($self->column_names_ordered);
         ${$aclass .'::TABLE'} = $self;
+
+        foreach my $colname ($self->column_names_ordered) {
+            *{$aclass .'::set_'. $colname} = sub {
+                my $self = shift;
+                return $self->$colname->set(@_);
+            };
+        }
     }
 
     return $self;
@@ -126,8 +133,10 @@ sub setup_column {
             $col->$key(shift);
         }
     }
+    $col->name || confess 'Column in table '.$self.' missing name';
     push(@{$self->{columns}}, $col);
     $self->{column_names}->{$col->name} = $col;
+    push(@{$self->{column_names_ordered}},$col->name);
 }
 
 
@@ -135,29 +144,8 @@ sub setup_columns {
     my $self = shift;
 
     foreach my $array (@_) {
-        my $col = SQL::DB::Column->new();
-        $col->table($self);
-
-        while (my $key = shift @{$array}) {
-            if ($key eq 'name') {
-                my $val = shift @{$array};
-                if (grep(m/^$val$/, @reserved)) {
-                    croak "Column can't be called '$val': reserved name";
-                }
-
-                if (exists($self->{column_names}->{$val})) {
-                    croak "Column $val already defined for table $self->{name}";
-                }
-                $col->name($val);
-            }
-            else {
-                $col->$key(shift @{$array});
-            }
-        }
-        push(@{$self->{columns}}, $col);
-        $self->{column_names}->{$col->name} = $col;
+        $self->setup_column(@$array);
     }
-
 }
 
 
@@ -178,6 +166,50 @@ sub setup_unique {
     my $self = shift;
     my $def  = shift;
     push(@{$self->{unique}}, [$self->text2cols($def)]);
+}
+
+
+sub setup_unique_index {
+    my $self = shift;
+    my $hashref = {unique => 1};
+
+    while (my $def = shift) {
+        my $val = shift;
+        if ($val) {
+            if ($def eq 'columns' and ref($val) and ref($val) eq 'ARRAY') {
+                foreach my $col (@{$val}) {
+                    (my $c = $col) =~ s/\s.*//;
+                if (!exists($self->{column_names}->{$c})) {
+                        croak "Index column $c not in table $self->{name}";
+                    }
+                }
+            }
+            elsif ($def eq 'columns') {
+                my @vals;
+                foreach my $col (split(m/,\s*/, $val)) {
+                    (my $c = $col) =~ s/\s.*//;
+                    if (!exists($self->{column_names}->{$c})) {
+                        croak "Index column $c not in table $self->{name}";
+                    }
+                    push(@vals, $col);
+                }
+                $val = \@vals;
+            }
+            $hashref->{$def} = $val;
+        }
+        else {
+            my @vals;
+            foreach my $col (split(m/,\s*/, $def)) {
+                (my $c = $col) =~ s/\s.*//;
+                    if (!exists($self->{column_names}->{$c})) {
+                    croak "Index column $c not in table $self->{name}";
+                }
+                push(@vals, $col);
+            }
+            $hashref->{columns} = \@vals;
+        }
+    }
+    push(@{$self->{index}}, $hashref);
 }
 
 
@@ -210,7 +242,15 @@ sub setup_index {
             $hashref->{$def} = $val;
         }
         else {
-            $hashref->{columns} = [$def];
+            my @vals;
+            foreach my $col (split(m/,\s*/, $def)) {
+                (my $c = $col) =~ s/\s.*//;
+                    if (!exists($self->{column_names}->{$c})) {
+                    croak "Index column $c not in table $self->{name}";
+                }
+                push(@vals, $col);
+            }
+            $hashref->{columns} = \@vals;
         }
     }
     push(@{$self->{index}}, $hashref);
@@ -301,6 +341,7 @@ sub class {
     return $self->{class};
 }
 
+
 sub columns {
     my $self = shift;
     return @{$self->{columns}};
@@ -309,7 +350,13 @@ sub columns {
 
 sub column_names {
     my $self = shift;
-    return keys %{$self->{column_names}};
+    return sort keys %{$self->{column_names}};
+}
+
+
+sub column_names_ordered {
+    my $self = shift;
+    return @{$self->{column_names_ordered}};
 }
 
 
@@ -394,6 +441,15 @@ sub sql_foreign {
 }
 
 
+sub sql_type {
+    my $self = shift;
+    if (!$self->{type}) {
+        return '';
+    }
+    return ' ENGINE='.$self->{type};
+}
+
+
 sub sql_engine {
     my $self = shift;
     if (!$self->{engine}) {
@@ -412,7 +468,7 @@ sub sql_default_charset {
 }
 
 
-sub sql {
+sub sql_create_table {
     my $self = shift;
     my @vals = map {$_->sql} $self->columns;
     push(@vals, $self->sql_primary) if ($self->{primary});
@@ -423,12 +479,12 @@ sub sql {
            . $self->{name}
            . " (\n    " . join(",\n    ", @vals) . "\n)"
            . $self->sql_engine
+           . $self->sql_type
            . $self->sql_default_charset
     ;
 }
 
-
-sub sql_index {
+sub sql_create_indexes {
     my $self = shift;
     my @sql = ();
 
@@ -445,10 +501,16 @@ sub sql_index {
                 . join('_',$self->{name}, @colsflat)
                 . ' ON ' . $self->{name}
                 . ($index->{using} ? ' USING '.$index->{using} : '')
-                . ' (' . join(', ', @cols) . ')'
+                . ' (' . join(',', @cols) . ')'
         );
     }
     return @sql;
+}
+
+
+sub sql_create {
+    my $self = shift;
+    return ($self->sql_create_table, $self->sql_create_indexes);
 }
 
 

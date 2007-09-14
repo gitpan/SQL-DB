@@ -7,7 +7,7 @@ BEGIN {
         plan skip_all => "DBD::SQLite not installed: $@";
     }
     else {
-        plan tests => 7;
+        plan tests => 9;
     }
 
 }
@@ -18,6 +18,10 @@ END {
 use_ok('SQL::DB');
 require_ok('t/Schema.pm');
 
+SQL::DB->import(qw/
+    max min count coalesce sum
+/);
+
 #$SQL::DB::DEBUG = 3;
 #$SQL::DB::ARow::DEBUG = 3;
 #$SQL::DB::Query::DEBUG = 1;
@@ -27,11 +31,7 @@ our $schema;
 our $db = SQL::DB->new;
 isa_ok($db, 'SQL::DB');
 
-$db = SQL::DB->new(Schema->All);
-isa_ok($db, 'SQL::DB');
-
-#our $schema = $db->schema(Schema->All);
-isa_ok($db->schema, 'SQL::DB::Schema');
+$db->define(Schema->All);
 
 $db->connect(
     "dbi:SQLite:/tmp/sqldb$$.db",undef,undef,
@@ -42,6 +42,12 @@ ok(1, 'connected');
 
 $db->deploy;
 ok(1, 'deployed');
+
+ok($db->create_seq('test'), "Sequence test created");
+my $val;
+ok($val = $db->seq('test'), "Sequence test $val");
+ok($val = $db->seq('test'), "Sequence test $val");
+ok($val = $db->seq('test'), "Sequence test $val");
 
 my $arow = Track->arow;
 $db->do(
@@ -98,10 +104,10 @@ foreach my $obj (@objs) {
 $track = Track->arow;
 $cd = CD->arow;
 @objs = $db->fetch(
-    select   => [ $track->id->func('count'),
+    select   => [ count($track->id)->as('count_id'),
                    $cd->title,
-                   $track->length->func('max'),
-                   $track->length->func('sum')],
+                   max($track->length)->as('max_length'),
+                   sum($track->length)->as('sum_length')],
     from       => [$track],
     inner_join => $cd,
     on         => $track->cd == $cd->id,
@@ -123,15 +129,14 @@ foreach my $obj (@objs) {
 
 $cd = CD->arow;
 $db->do(
-    update => $cd,
-    set     => [$cd->year->set(2006)],
+    update => $cd->set_year(2006),
     where    => $cd->id == 10,
 );
 
 $cd = CD->arow;
 my $track2 = Track->arow;
 my $cd2 = CD->arow;
-my $q2 =  $db->schema->query(
+my $q2 =  $db->query(
     select   => [ $track2->title, $cd2->year ],
     distinct => 1,
     from     => [$track2, $cd2],
@@ -161,13 +166,23 @@ foreach (@res) {
     print $_->name .' ('.$_->craziness .")\n";
 }
 
+my $res = $db->fetch1(
+    select => [$fan->name, $fan->craziness],
+    from   => [$fan, $artist, $link],
+    where   => ($artist->name == 'Queen') &
+                ($link->fan == $fan->id) & ($link->artist == $artist->id)
+);
+
+print "Only the first Queen Fan (with craziness)\n";
+print $res->name .' ('.$res->craziness .")\n";
+
 
 $fan = Fan->arow;
 $link = ArtistFan->arow;
 @res = $db->fetch(
     select => [$fan->name, $fan->craziness],
     from   => $fan,
-    where   => $fan->id->not_in($db->schema->query(select => [$link->fan],
+    where   => $fan->id->not_in($db->query(select => [$link->fan],
                     from => [$link])),
 );
 
@@ -220,11 +235,10 @@ $db->do(
 
 $track = Track->arow;
 $db->do(
-    update => $track,
-    set    => [ $track->id->set(3),
-                $track->cd->set(2),
-                $track->title->set('Who wants to live forever?'),
-                $track->length->set($track->length + 1)
+    update => [ $track->set_id(3),
+                $track->set_cd(2),
+                $track->set_title('Who wants to live forever?'),
+                $track->set_length($track->length + 1)
     ],
     where => $track->id == 3,
 );

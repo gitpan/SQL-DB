@@ -1,3 +1,121 @@
+Commit: 5cc2c48074503df92da8f2eb04e1bfad33dafd61 
+Author: Mark Lawrence <nomad@null.net> Fri, 14 Sep 2007 10:04:38 +0200 
+
+    General:
+        What is it with UNIVERSAL qw(isa) not letting me use 'isa()' on its
+        own?
+    SQL::DB::Query
+        Removed st_columns (old alias for st_select) as it doesn't look like
+        anything SQL.
+    CPAN
+        Uploaded as 0.05.
+
+Commit: 68422f5b3549d0cb1f0f7387d884641a6e31bf08 
+Author: Mark Lawrence <nomad@null.net> Fri, 14 Sep 2007 01:49:17 +0200 
+
+    New syntax for UPDATE:
+        update => [$table->set_column($value)]
+        # or
+        update => [$table->column->set($value)]
+    SQL::DB::Expr
+        Minor cleanup of "" overloading methods.
+    SQL::DB::AColumn
+        Reworked internals based on SQL::DB::Expr changes in previous commit.
+    SQL::DB::Table
+        Added dynamically generated "set_column" methods to ARows for new
+        UPDATE syntax.
+    SQL::DB::Query
+        Removed the "set => [...]" syntax.
+        Less duplication of parent class (Expr) methods.
+    Tests
+        A few more added to the mix.
+
+Commit: 06b5561cef4479dff30ddb676620bfd4d5853437 
+Author: Mark Lawrence <nomad@null.net> Wed, 12 Sep 2007 21:23:17 +0200 
+
+    SQL::DB::Functions
+        Renamed to SQL::DB::Function.
+        Big cleanup/rewrite with new support for MAX, MIN, COUNT & SUM.
+        Tests for all functions.
+    
+    SQL::DB::Expr
+        Added missing tests to git.
+    
+    SQL::DB::Schema
+        Now exports on request the Functions subroutines.
+    
+    SQL::DB
+        Now exports on request the Functions subroutines.
+        Added example function use to the SYNOPSIS.
+
+Commit: 3256dd399dffe0481f71d500f980e69e3677c7db 
+Author: Mark Lawrence <nomad@null.net> Wed, 12 Sep 2007 18:22:16 +0200 
+
+    SQL::DB::Expr
+        Complete cleanup and factoring of code, with tests. Looks like this
+        class now does what it should.
+
+Commit: ea8813c18ccfc8fba1f696bd7bfd6a86632f5f20 
+Author: Mark Lawrence <nomad@null.net> Tue, 11 Sep 2007 22:44:38 +0200 
+
+    SQL::DB::Functions and t/functions.t added.
+
+Commit: 1cdb044cb1e13e4d678c3fe94e04232de42523c4 
+Author: Mark Lawrence <nomad@null.net> Mon, 10 Sep 2007 10:17:38 +0200 
+
+    SQL::DB::Table: simplified 'setup_columns' to use 'setup_column'
+
+Commit: 295650d9f006a81f2fd74ba4ada7d0267e2a4af9 
+Author: Mark Lawrence <nomad@null.net> Sun, 09 Sep 2007 21:50:46 +0200 
+
+    * Built-in sequences support.
+    * All internal hash keys now prefixed by 'sqldb_'.
+    * New SQL::DB::Functions package. First function 'coalesce' created.
+
+Commit: 912f076f80903d94edc60d2e430dd918549a0c89 
+Author: Mark Lawrence <nomad@null.net> Sat, 08 Sep 2007 21:04:57 +0200 
+
+    SQL::DB now inherits directly from SQL::DB::Schema. Hence schema() method
+    removed and define() and query() come directly from parent class.
+    Fixed up bug in t/synopsis.t and cleaned up SYNOPSIS to actually run.
+    Documentation for above updated.
+    New sql_create(), sql_create_table() and sql_create_indexes() methods for
+    SQL::DB::Table. t/02-table.t updated to test for these.
+
+Commit: 40b94121a45e3a5bac08bab01bf9d4be2bb8a4f4 
+Author: Mark Lawrence <nomad@null.net> Sat, 08 Sep 2007 19:58:07 +0200 
+
+    Added a fetch1() method to return a single value.
+
+Commit: 96859c4215b51866166cd4433f3373807de533da 
+Author: Mark Lawrence <nomad@null.net> Sat, 08 Sep 2007 19:44:54 +0200 
+
+    Fixed a Query bug where not all table aliases were removed in non-SELECT
+    statements.
+
+Commit: a8ec7eb4dec4168e3f817d98c874fe995c450fa9 
+Author: Mark Lawrence <nomad@null.net> Thu, 06 Sep 2007 16:44:04 +0200 
+
+    Added MySQL table ENGINE|TYPE.
+    Added unique_index as a shortcut for index => [unique => 1, ...]
+
+Commit: 4a5cde2bef168ddc6ed18d62c84807cbccea41d1 
+Author: Mark Lawrence <nomad@null.net> Thu, 06 Sep 2007 14:38:16 +0200 
+
+    Removed requirement for Perl 5.8. Not sure why it was set in the first
+    place - maybe to do with Scalar::Util::weaken support?
+
+Commit: e59dac4fd11d854760b4556f238ef548dd639937 
+Author: Mark Lawrence <nomad@null.net> Wed, 05 Sep 2007 14:43:21 +0200 
+
+    VERSION to 0.05
+
+Commit: c2ed27063c0348ba3750221a3a1f5423ed09590a 
+Author: Mark Lawrence <nomad@null.net> Wed, 05 Sep 2007 13:50:54 +0200 
+
+    Debian control description and changes update.
+    Released to CPAN as version 0.04.
+
 Commit: 011f261861eae7d691705f407aed9def3159e02c 
 Author: Mark Lawrence <nomad@null.net> Wed, 05 Sep 2007 13:42:51 +0200 
 

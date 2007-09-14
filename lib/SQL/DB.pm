@@ -2,89 +2,98 @@ package SQL::DB;
 use 5.006;
 use strict;
 use warnings;
+use base qw(SQL::DB::Schema);
 use Carp qw(carp croak confess);
 use DBI;
-use Scalar::Util qw(refaddr);
-use UNIVERSAL;
+use UNIVERSAL qw(isa);
 use SQL::DB::Schema;
+use SQL::DB::Function;
 use Class::Accessor::Fast;
 
 use Data::Dumper;
 $Data::Dumper::Indent = 1;
 
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 our $DEBUG   = 0;
+our @EXPORT_OK = @SQL::DB::Function::EXPORT_OK;
+
+foreach (@EXPORT_OK) {
+    no strict 'refs';
+    *{$_} = *{'SQL::DB::Function::'.$_};
+}
 
 
 sub new {
     my $proto = shift;
     my $class = ref($proto) || $proto;
-    my $self  = bless({}, $class);
-    $self->{schema} = SQL::DB::Schema->new(@_);
+    my $self  = bless($class->SUPER::new(@_), $class);
+    $self->define([
+        table => 'sqldb',
+        class => 'SQL::DB::Sequence',
+        column => [name => 'name', type => 'VARCHAR(32)', unique => 1],
+        column => [name => 'val', type => 'INTEGER'],
+    ]);
     return $self;
-}
-
-
-sub define {
-    my $self = shift;
-    $self->{schema}->define(@_);
-}
-
-
-sub schema {
-    my $self = shift;
-    if (@_) {
-        my $schema = shift;
-        UNIVERSAL::isa($schema, 'SQL::DB::Schema') ||
-            croak "Schema must be an SQL::DB::Schema object";
-        $self->{schema} = $schema;
-    }
-    return $self->{schema};
-}
-
-
-sub connect_cached {
-    my $self = shift;
-    $self->{_connect} = 'connect_cached';
-    return $self->connect(@_);
 }
 
 
 sub connect {
     my $self = shift;
-    my $method = $self->{_connect} || 'connect';
 
     my ($dbi,$user,$pass,$attrs) = @_;
 
-    if (my $dbh = DBI->$method($dbi,$user,$pass,$attrs)) {
-        $self->{dbh} = $dbh;
+    if (my $dbh = DBI->connect($dbi,$user,$pass,$attrs)) {
+        $self->{sqldb_dbh} = $dbh;
     }
     else {
         croak $DBI::errstr;
     }
 
-    $self->{dbi}    = $dbi,
-    $self->{user}   = $user,
-    $self->{pass}   = $pass,
-    $self->{attrs}  = $attrs,
-    $self->{qcount} = 0,
+    $self->{sqldb_dbi}    = $dbi;
+    $self->{sqldb_user}   = $user;
+    $self->{sqldb_pass}   = $pass;
+    $self->{sqldb_attrs}  = $attrs;
+    $self->{sqldb_qcount} = 0;
 
-    warn "debug: $method to $dbi" if($DEBUG);
+    warn "debug: connected to $dbi" if($DEBUG);
+    return;
+}
+
+
+sub connect_cached {
+    my $self = shift;
+
+    my ($dbi,$user,$pass,$attrs) = @_;
+
+    if (my $dbh = DBI->connect_cached($dbi,$user,$pass,$attrs)) {
+        $self->{sqldb_dbh} = $dbh;
+    }
+    else {
+        croak $DBI::errstr;
+    }
+
+    $self->{sqldb_dbi}    = $dbi;
+    $self->{sqldb_user}   = $user;
+    $self->{sqldb_pass}   = $pass;
+    $self->{sqldb_attrs}  = $attrs;
+    $self->{sqldb_qcount} = 0;
+
+    warn "debug: connect_cached to $dbi" if($DEBUG);
     return;
 }
 
 
 sub dbh {
     my $self = shift;
-    return $self->{dbh};
+    return $self->{sqldb_dbh};
 }
 
 
 sub deploy {
     my $self = shift;
 
-    foreach my $table ($self->{schema}->tables) {
-        my $sth = $self->{dbh}->table_info('', '', $table->name, 'TABLE');
+    foreach my $table ($self->tables) {
+        my $sth = $self->{sqldb_dbh}->table_info('', '', $table->name, 'TABLE');
         if (!$sth) {
             die $DBI::errstr;
         }
@@ -94,13 +103,73 @@ sub deploy {
             next;
         }
 
-        foreach my $action ($table->sql, $table->sql_index) {
+        foreach my $action ($table->sql_create) {
             warn "debug: $action" if($DEBUG);
-            if (!$self->{dbh}->do($action)) {
-                die $self->{dbh}->errstr;
+            if (!$self->{sqldb_dbh}->do($action)) {
+                die $self->{sqldb_dbh}->errstr;
             }
         }
     }
+}
+
+
+sub create_seq {
+    my $self = shift;
+    my $name = shift || croak 'usage: $db->create_seq($name)';
+
+    $self->{sqldb_dbi} || croak 'Must be connected before calling create_seq';
+
+    my $s = SQL::DB::Sequence::Abstract->new;
+
+    if (eval {
+        $self->do(
+            insert  => [$s->name, $s->val],
+            values  => [$name, 0],
+        );
+        }) {
+        return 1;
+    }
+    warn "CreateSequence: $@";
+    return;
+}
+
+
+sub seq {
+    my $self = shift;
+    my $name = shift || croak 'usage: $db->seq($name)';
+
+    $self->{sqldb_dbi} || croak 'Must be connected before calling seq';
+
+    $self->{sqldb_dbh}->begin_work;
+    my $s = SQL::DB::Sequence::Abstract->new;
+    my $r;
+
+    if (eval {
+        $r = $self->fetch1(
+            select     => [$s->val],
+            from       => $s,
+            for_update => ($self->{sqldb_dbi} !~ m/sqlite/i),
+            where      => $s->name == $name,
+        );
+
+        die "Can't find sequence $name" unless($r);
+
+        $self->do(
+            update  => [$s->val->set($r->val + 1)],
+            where   => $s->name == $name,
+        );
+
+        1;}) {
+
+        $self->{sqldb_dbh}->commit;
+        return $r->val + 1;
+    }
+    else {
+        my $tmp = $@;
+        eval {$self->{sqldb_dbh}->rollback;};
+        croak "seq: $tmp";
+    }
+    return;
 }
 
 
@@ -109,22 +178,21 @@ sub deploy {
 # ------------------------------------------------------------------------
 
 sub do {
-    my $self  = shift;
-    my $query = $self->{schema}->query(@_);
-    my ($sql,$attrs,@bind) = ($query->sql, undef, $query->bind_values);
+    my $self        = shift;
+    my $query       = $self->query(@_);
 
     my $rv;
     eval {
-        $rv = $self->{dbh}->do($sql, $attrs, @bind);
+        $rv = $self->{sqldb_dbh}->do("$query", undef, $query->bind_values);
     };
-    if ($@ or !defined($rv)) {
-        croak "DBI::do $DBI::errstr $@: Query was:\n"
-              . "$sql/* ". join(', ', map {"'$_'"} @bind) . " */\n";
-    }
-    $self->{qcount}++;
 
-    carp "debug: $sql/* ".  join(', ',map {defined($_) ? "'$_'" : 'NULL'}
-                                 @bind) ." */ RESULT: $rv" if($DEBUG);
+    if ($@ or !defined($rv)) {
+        croak "DBI::do $DBI::errstr $@: Query was:\n". $query->_as_string;
+    }
+
+    $self->{sqldb_qcount}++;
+
+    carp 'debug: '. $query->_as_string if($DEBUG);
     return $rv;
 }
 
@@ -135,7 +203,7 @@ sub execute {
 
     my $sth;
     eval {
-        $sth = $self->{dbh}->prepare($sql);
+        $sth = $self->{sqldb_dbh}->prepare($sql);
     };
     if ($@ or !$sth) {
         croak "DBI::prepare $DBI::errstr $@: Query was:\n"
@@ -153,7 +221,7 @@ sub execute {
 
     carp "debug: $sql/* ". join(', ',map {defined($_) ? "'$_'" : 'NULL'}
                                 @bind) ." */ RESULT: $res" if($DEBUG);
-    $self->{qcount}++;
+    $self->{sqldb_qcount}++;
     return $sth;
 }
 
@@ -166,8 +234,8 @@ sub execute {
 
 sub fetch {
     my $self = shift;
-    my $query   = $self->{schema}->query(@_);
-    my $sth     = $self->execute($query->sql, undef, $query->bind_values);
+    my $query   = $self->query(@_);
+    my $sth     = $self->execute("$query", undef, $query->bind_values);
 
     if ($query->wantobjects) {
         return $self->objects($query, $sth);
@@ -178,12 +246,31 @@ sub fetch {
 }
 
 
+sub fetch1 {
+    my $self = shift;
+    my $query   = $self->query(@_);
+    my $sth     = $self->execute($query, undef, $query->bind_values);
+
+    my @results;
+    if ($query->wantobjects) {
+        @results = $self->objects($query, $sth);
+    }
+    else {
+        @results = $self->simple_objects($query, $sth);
+    }
+    return $results[0];
+}
+
+
 sub simple_objects {
     my $self    = shift;
     my $query   = shift;
     my $sth     = shift;
 
     my @names = map {$_->_name} $query->acolumns;
+    for my $i (0..$#names) {
+        $names[$i] =~ s/t\d+\.//;
+    }
     my $class = '_' . join('_', @names);
 
     {
@@ -201,17 +288,11 @@ sub simple_objects {
         map {$hash->{$_} = $row->[$i++]} @names;
         push(@returns, $class->new($hash));
     }
-    die $self->{dbh}->errstr if ($self->{dbh}->errstr);
+    die $self->{sqldb_dbh}->errstr if ($self->{sqldb_dbh}->errstr);
 
     warn 'debug: # returns: '. scalar(@returns) if($DEBUG);
 
-    if (wantarray) {
-        return @returns;
-    }
-    elsif (@returns > 1) {
-        die "Multiple results returned - single result required";
-    }
-    return $returns[0];
+    return @returns;
 }
 
 
@@ -277,17 +358,11 @@ sub objects {
         }
         push(@returns, $first);
     }
-    die $self->{dbh}->errstr if ($self->{dbh}->errstr);
+    die $self->{sqldb_dbh}->errstr if ($self->{sqldb_dbh}->errstr);
 
     warn 'debug: # returns: '. scalar(@returns) if($DEBUG);
 
-    if (wantarray) {
-        return @returns;
-    }
-    elsif (@returns > 1) {
-        die "Multiple results returned - single result required";
-    }
-    return $returns[0];
+    return @returns;
 }
 
 
@@ -331,15 +406,15 @@ sub delete {
 
 sub qcount {
     my $self = shift;
-    return $self->{qcount};
+    return $self->{sqldb_qcount};
 }
 
 
 sub disconnect {
     my $self = shift;
-    if ($self->{dbh}) {
+    if ($self->{sqldb_dbh}) {
         warn 'debug: Disconnecting from DBI' if($DEBUG);
-        $self->{dbh}->disconnect;
+        $self->{sqldb_dbh}->disconnect;
     }
     return;
 }
@@ -361,14 +436,20 @@ SQL::DB - Perl interface to SQL Databases
 
 =head1 VERSION
 
-0.04. Development release.
+0.05. Development release.
 
 =head1 SYNOPSIS
 
-  use SQL::DB;
-  my $db = SQL::DB->new();
-
-  $db->define([
+  use SQL::DB qw(max min coalesce count);
+  my $db = SQL::DB->new(
+    [
+      table  => 'addresses',
+      class  => 'Address',
+      column => [name => 'id',   type => 'INTEGER', primary => 1],
+      column => [name => 'kind', type => 'INTEGER'],
+      column => [name => 'city', type => 'INTEGER'],
+    ],
+    [
       table  => 'persons',
       class  => 'Person',
       column => [name => 'id',      type => 'INTEGER', primary => 1],
@@ -381,15 +462,8 @@ SQL::DB - Perl interface to SQL Databases
                                     ref  => 'persons(id)',
                                     null => 1],
       index  => 'name',
-  ]);
-
-  $db->define([
-      table        => 'addresses',
-      class        => 'Address',
-      column       => [name => 'id',   type => 'INTEGER', primary => 1],
-      column       => [name => 'kind', type => 'INTEGER'],
-      column       => [name => 'city', type => 'INTEGER'],
-  ]);
+    ],
+  );
 
   $db->connect('dbi:SQLite:/tmp/sqldbtest.db', 'user', 'pass', {});
   $db->deploy;
@@ -407,8 +481,7 @@ SQL::DB - Perl interface to SQL Databases
   );
 
   $db->do(
-    update => $person,
-    set    => [$person->address->set(2)],
+    update => [$person->address->set(2)],
     where  => $person->name == 'Homer',
   );
 
@@ -416,12 +489,23 @@ SQL::DB - Perl interface to SQL Databases
   my $p   = Person::Abstract->new;
   my $add = Address::Abstract->new;
 
+  my $ans = $db->fetch1(
+    select    => [count($p->name)->as('count_name'),
+                  max($p->age)->as('max_age')],
+    from      => $p,
+    where     => $p->age > 40,
+  );
+
+  print 'Head count: '. $ans->count_name .' Max age:'.$ans->max_age."\n";
+  # "Head count: 1 Max age:43"
+
+
   my @items = $db->fetch(
     select    => [$p->name, $p->age, $add->city],
     from      => $p,
     left_join => $add,
     on        => $add->id == $p->address,
-    where     => $add->city == 'Springfield' & $p->age > 40,
+    where     => ($add->city == 'Springfield') & ($p->age > 40),
     order_by  => $p->age->desc,
     limit     => 10,
   );
@@ -429,7 +513,8 @@ SQL::DB - Perl interface to SQL Databases
   foreach my $item (@items) {
       print $item->name, '(',$item->age,') lives in ', $item->city, "\n";
   }
-  # "Homer(38) lives in Springfield"
+  # "Homer(43) lives in Springfield"
+  return @items # this line for automatic test
 
 =head1 DESCRIPTION
 
@@ -438,7 +523,7 @@ objects and logic operators. It is not quite an Object Mapping Layer
 (such as L<Class::DBI>) and is also not quite an an abstraction
 (like L<SQL::Abstract>). It falls somewhere inbetween.
 
-For a more complete introduction see L<SQL::DB::Tutorial>.
+For a more complete introduction see L<SQL::DB::Intro>.
 
 =head1 METHODS
 
@@ -449,13 +534,7 @@ according to L<SQL::DB::Schema>.
 
 =head2 define(@def)
 
-Add to the schema definition. The mandatory @def must be a list of
-ARRAY refs as required by L<SQL::DB::Schema>.
-
-=head2 schema($schema)
-
-Returns the current schema object. The optional $schema will set the
-current value. Will croak if $schema is not an L<SQL::DB::Schema> object.
+Add to the schema definition. Inherited from L<SQL::DB::Schema>.
 
 =head2 connect($dbi, $user, $pass, $attrs)
 
@@ -474,9 +553,14 @@ Returns the L<DBI> database handle we are connected with.
 
 =head2 deploy
 
-Runs the CREATE TABLE statements necessary to create the
-$schema in the database. Will warn on any tables that already exist.
-Will croak if the schema has not yet been defined.
+Runs the CREATE TABLE and CREATE INDEX statements necessary to
+create the schema in the database. Will warn on any tables that
+already exist.
+
+=head2 query(@query)
+
+Returns an L<SQL::DB::Query> built from @query. This method is useful
+when you are creating nested queries and UNION statements.
 
 =head2 do(@query)
 
@@ -498,6 +582,13 @@ columns or functions in the query.
 
 If the query used a "selecto" then returns a list of SQL::DB::Object
 -based objects.
+
+=head2 fetch1(@query)
+
+Is the same as fetch(), but only returns the first element from the
+result set. Either you know you will only get one result, or you
+should be using some kind of LIMIT statement so that extra rows
+are not retrieved by the database.
 
 =head2 insert($sqlobject)
 

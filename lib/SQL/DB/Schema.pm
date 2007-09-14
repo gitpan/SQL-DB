@@ -1,14 +1,21 @@
 package SQL::DB::Schema;
-use 5.008;
 use strict;
 use warnings;
+use base qw(Exporter);
 use Carp qw(carp croak confess);
 
 use SQL::DB::Table;
 use SQL::DB::Query;
+use SQL::DB::Function;
 
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 our $DEBUG;
+our @EXPORT_OK = @SQL::DB::Function::EXPORT_OK;
+
+foreach (@EXPORT_OK) {
+    no strict 'refs';
+    *{$_} = *{'SQL::DB::Function::'.$_};
+}
 
 use Data::Dumper;
 $Data::Dumper::Indent = 1;
@@ -18,8 +25,8 @@ sub new {
     my $proto = shift;
     my $class = ref($proto) || $proto;
     my $self = {
-        tables      => [],
-        table_names => {},
+        sqldbs_tables      => [],
+        sqldbs_table_names => {},
     };
     bless($self,$class);
 
@@ -43,12 +50,12 @@ sub define {
 
         my $table = SQL::DB::Table->new(schema => $self, @{$def});
 
-        if (exists($self->{table_names}->{$table->name})) {
+        if (exists($self->{sqldbs_table_names}->{$table->name})) {
             croak "Table ". $table->name ." already defined";
         }
 
-        push(@{$self->{tables}}, $table);
-        $self->{table_names}->{$table->name} = $table;
+        push(@{$self->{sqldbs_tables}}, $table);
+        $self->{sqldbs_table_names}->{$table->name} = $table;
     }
     return;
 }
@@ -59,10 +66,10 @@ sub table {
     my $name  = shift;
 
     if ($name) {
-        if (!exists($self->{table_names}->{$name})) {
+        if (!exists($self->{sqldbs_table_names}->{$name})) {
             confess "Table '$name' has not been defined";
         }
-        return $self->{table_names}->{$name};
+        return $self->{sqldbs_table_names}->{$name};
     }
     confess 'usage: table($name)';
 }
@@ -72,7 +79,7 @@ sub tables {
     my $self = shift;
     my $name  = shift;
 
-    return @{$self->{tables}};
+    return @{$self->{sqldbs_tables}};
 }
 
 
@@ -90,7 +97,7 @@ SQL::DB::Schema - Generate SQL using Perl logic and objects
 
 =head1 VERSION
 
-0.04. Development release.
+0.05. Development release.
 
 =head1 SYNOPSIS
 
