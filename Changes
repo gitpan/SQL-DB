@@ -1,3 +1,143 @@
+Commit: 8a652f903b734c08d9d1906b467771c914597d40 
+Author: Mark Lawrence <nomad@null.net> Thu, 04 Oct 2007 18:32:15 +0200 
+
+    Uploaded to CPAN as v0.06
+
+Commit: 34bcbe5cc9bdc0428b5c637442bfbb9899716e72 
+Author: Mark Lawrence <nomad@null.net> Thu, 04 Oct 2007 17:24:10 +0200 
+
+    SQL::DB
+        * Deal with broken MySQL table_info filtering
+        * seq(): LOCK both 'sqldb' and the alias. Added missing UNLOCK
+
+Commit: 854055f98cdc556e3947f5ea00386ddb6a7068ee 
+Author: Mark Lawrence <nomad@null.net> Wed, 03 Oct 2007 19:05:50 +0200 
+
+    SQL::DB
+        Make update(), insert(), delete() return true if successful.
+
+Commit: 4f45a93491a59dae8a097148139e7194d6df32fc 
+Author: Mark Lawrence <nomad@null.net> Mon, 01 Oct 2007 17:00:30 +0200 
+
+    Moved SQL::DB::Intro back to SQL::DB::Tutorial. Still incomplete...
+
+Commit: 15e27509cf684c3bb911c9de93c417458f94009d 
+Author: Mark Lawrence <nomad@null.net> Mon, 01 Oct 2007 16:09:14 +0200 
+
+    SQL::DB
+        LOCK TABLES command for MySQL sequence emulation.
+
+Commit: 2667ea0ea84ed5d272c382809dabfe958e0dcb1c 
+Author: Mark Lawrence <nomad@null.net> Mon, 01 Oct 2007 15:44:59 +0200 
+
+    SQL::DB
+        Improved the debugging output to show a real SQL statement with the
+        bind values actually quoted inline. This means you can now cut and
+        paste the text into an SQL session in order to see the actual result.
+
+Commit: 556a0de835016f472e6db3de3cc435bc4beb34e5 
+Author: Mark Lawrence <nomad@null.net> Thu, 27 Sep 2007 19:47:19 +0200 
+
+    SQL::DB
+        Fixed sequence support to actually check that an update occurs when
+        incrementing the value. Aparently MySQL SELECT .. FOR UPDATE doesn't
+        actually lock rows (MySQL bug?)
+    
+    SQL::DB::Query
+        Added INTERSECT operator.
+
+Commit: 09b3ac307a1a2fdc0be6f831f7946b68aa88f88f 
+Author: Mark Lawrence <nomad@null.net> Wed, 19 Sep 2007 09:54:29 +0200 
+
+    General
+        New: Inflation of columns upon SELECT. Deflation in the works.
+        All _new() methods have become new() to be more standard.
+    
+    SQL::DB
+        Clearer error messages on some failure/error conditions.
+        Fixed position of FOR UPDATE in the internal sequence support.
+        fetch()/fetch1() adjusted to the new SQL::DB::Row implementation.
+        Documentation cleanup.
+    
+    SQL::DB::Row
+        Complete rewrite to be a more intelligent object. Now keeps track of:
+        a) the SQL::DB::Columns associated with the query / class; and b) the
+        columns that have been modified. So now we can call q_update() and
+        get a list of statements for each table to update the modified columns.
+    
+    SQL::DB::Expr
+        New utility methods val() and set_val() for use by parent classes
+        (abstracts away the internals which AColumn had been using).
+        New between() (SQL BETWEEN) method. Just realised should be in AColumn.
+    
+    SQL::DB::Function
+        New SQL functions: CAST, NOW
+        Big cleanup / refactoring.
+    
+    SQL::DB::Query
+        Removed the unused column_names() method.
+    
+    SQL::DB::Schema, SQL::DB::Table
+        Moved the guts of the arow() method from Schema to Table where it
+        belongs. Thinking about renaming it atable() as that is what it looks
+        like it is when writing queries.
+    
+    SQL::DB::AColumn
+        as_string(), _clone() and _as() all moved/removed into the parent
+        SQL::DB::Expr class as they are more general methods than just AColumn.
+    
+    SQL::DB::Column
+        New "inflate" and "deflate" definitions to for modifying column data
+        between the database and the SQL::DB::Row objects.
+        "default" definition now accepts a subref as well scalars.
+    
+    SQL::DB::Object
+        Runs the "default" method for a column if it is a CODE ref, when
+        creating objects.
+
+Commit: 26a1fab79ebd6f23e1d563056bfdbf9f8625bfe7 
+Author: Mark Lawrence <nomad@null.net> Sat, 15 Sep 2007 11:38:00 +0200 
+
+    SQL::DB::Object
+        Fixed up q_* methods that were still using the old ->arow.
+    
+    SQL::DB
+        Fixed up broken query count reporting.
+        Properly removed the simple object support.
+    
+    SQL::DB::Query
+        Removed 'selecto' option (not very SQL'ish).
+
+Commit: 888d13f9f4bb1547f35c682ba1003eed2903f53b 
+Author: Mark Lawrence <nomad@null.net> Fri, 14 Sep 2007 15:43:59 +0200 
+
+    Syntax changes:
+        Abstract rows are now associated with table names only and must be
+        obtained via $db->arow($tablename). The old "Artist->arow" or
+        "Artist::Abstract->new" are gone.
+    SQL::DB::Table
+        Abstract classes are now named SQL::DB::ARow::<tablename>
+    SQL::DB::Row
+        New module providing lightweight ARRAY-based objects. This
+        functionality has been removed from SQL::DB. I should be able to
+        replace this with something from CPAN but couldn't find the right thing
+        yet.
+    SQL::DB
+        fetch() and fetch1() now use the most efficient DBI calls to obtain
+        data.
+        New methods fetcho() and fetcho1() for retrieving full objects. These
+        should eventually moved out of SQL::DB entirely? SQL::DBO?
+        Documentation cleanup.
+    SQL::DB::Function
+        Added PostgreSQL nextval(), currval() and setval() functions.
+    SQL::DB::Object
+        Removed arow() method. SQL::DB::Object should be completely decoupled
+        from anything else.
+    SQL::DB::Schema
+        New arow() method.
+    t/*
+        Various additions and cleanups.
+
 Commit: 5cc2c48074503df92da8f2eb04e1bfad33dafd61 
 Author: Mark Lawrence <nomad@null.net> Fri, 14 Sep 2007 10:04:38 +0200 
 

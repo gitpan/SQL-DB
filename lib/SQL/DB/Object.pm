@@ -37,6 +37,18 @@ sub new {
     my $self  = $class->SUPER::new($hash);
     bless($self,$class);
     map {$self->_table->column($_) ? $self->{_changed}->{$_} = 1 : undef} keys %{$hash};
+
+    foreach ($self->_table->columns) {
+        if (!exists $self->{_changed}->{$_->name} and my $def = $_->default) {
+            if (ref($def) and ref($def) eq 'CODE') {
+                my $set = 'set_'.$_->name;
+                $self->$set(&$def);
+            }
+            else {
+                $self->{$_->name} = $def;
+            }
+        }
+    }
     return $self;
 }
 
@@ -46,13 +58,6 @@ sub _table {
     my $proto = ref($self) || $self;
     no strict 'refs';
     return ${ref($self) . '::TABLE'};
-}
-
-
-sub arow {
-    my $proto = shift;
-    my $class = (ref($proto) || $proto) .'::Abstract';
-    return $class->_new;
 }
 
 
@@ -74,23 +79,23 @@ sub _in_storage {
 
 sub q_insert {
     my $self = shift;
-    my $arow    = $self->arow;
+    my $arow    = $self->_table->schema->arow($self->_table->name);
     my @changed = $self->_changed;
 
     if (!@changed) {
         carp "$self has no values to insert";
     }
 
-    return (
+    return ([
         insert => [ map {$arow->$_} @changed ],
         values => [ map {$self->$_} @changed ],
-    );
+    ]);
 }
 
 
 sub q_update {
     my $self    = shift;
-    my $arow    = $self->arow;
+    my $arow    = $self->_table->schema->arow($self->_table->name);
     my @primary = $self->_table->primary_columns;
     my @changed = $self->_changed;
 
@@ -104,16 +109,16 @@ sub q_update {
                         : ($arow->$colname == $self->$colname)
     }
 
-    return (
+    return ([
         update => [ map {$arow->$_->set($self->$_)} @changed],
         where  => $where,
-    );
+    ]);
 }
 
 
 sub q_delete {
     my $self    = shift;
-    my $arow    = $self->arow;
+    my $arow    = $self->_table->schema->arow($self->_table->name);
     my @primary = $self->_table->primary_columns;
 
     my $where;
@@ -122,10 +127,10 @@ sub q_delete {
                         : ($arow->$colname == $self->$colname)
     }
 
-    return (
+    return ([
         delete_from => $arow,
         where  => $where,
-    );
+    ]);
 }
 
 

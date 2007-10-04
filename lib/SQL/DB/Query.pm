@@ -60,12 +60,6 @@ sub push_bind_values {
 }
 
 
-sub wantobjects {
-    my $self = shift;
-    return $self->{selecto};
-}
-
-
 sub arows {
     my $self = shift;
     if ($self->{arows}) {
@@ -79,15 +73,6 @@ sub acolumns {
     my $self = shift;
     if ($self->{acolumns}) {
         return @{$self->{acolumns}};
-    }
-    return;
-}
-
-
-sub column_names {
-    my $self = shift;
-    if ($self->{columns}) {
-        return map {$_->name} @{$self->{columns}};
     }
     return;
 }
@@ -163,7 +148,7 @@ sub sql_insert {
 
     return "INSERT INTO\n    ". $ref->[0]->_arow->_table_name
            . ' ('
-           . join(', ', map {$_->_name} @{$ref})
+           . join(', ', map {$_->_column->name} @{$ref})
            . ")\n";
 }
 
@@ -200,9 +185,11 @@ sub sql_values {
 
 sub st_update {
     my $self = shift;
-    my $ref  = shift;
+    my $ref  = shift || croak 'update requires values';
 
     my @items = (UNIVERSAL::isa($ref,'ARRAY') ? @$ref : $ref);
+    @items || croak 'update requires values';
+
     foreach (@items) {
         if (UNIVERSAL::isa($_, 'SQL::DB::Expr')) {
             $self->push_bind_values($_->bind_values);
@@ -215,12 +202,14 @@ sub st_update {
     return;
 }
 
+
 sub sql_update {
     my $self = shift;
     my $name = shift;
 
     return "UPDATE\n    " . $name . "\n";
 }
+
 
 sub sql_set {
     my $self = shift;
@@ -241,19 +230,12 @@ sub st_select {
     my @items    = ref($ref) eq 'ARRAY' ? @{$ref} : $ref;
     my @acolumns = map {UNIVERSAL::isa($_, 'SQL::DB::ARow') ? $_->_columns : $_} @items;
 
+    $self->push_bind_values(map {UNIVERSAL::isa($_, 'SQL::DB::Expr') ? $_->bind_values : ()} @acolumns);
+
     push(@{$self->{acolumns}}, @acolumns);
     push(@{$self->{query}}, 'sql_select', undef);
 
     return;
-}
-
-
-sub st_selecto {
-    my $self = shift;
-    my $ref  = shift;
-
-    $self->{selecto} = 1;
-    return $self->st_select($ref);
 }
 
 
@@ -455,6 +437,25 @@ sub sql_union {
     my $self = shift;
     my $ref  = shift;
     return "UNION \n" . $ref . "\n";
+}
+
+
+sub st_intersect {
+    my $self = shift;
+    my $ref  = shift;
+    unless(UNIVERSAL::isa($ref, 'SQL::DB::Expr')) {
+        confess "Select INTERSECT must be based on SQL::DB::Expr";
+    }
+    push(@{$self->{query}}, 'sql_intersect', $ref);
+    $self->push_bind_values($ref->bind_values);
+    return;
+}
+
+
+sub sql_intersect {
+    my $self = shift;
+    my $ref  = shift;
+    return "INTERSECT \n" . $ref . "\n";
 }
 
 
