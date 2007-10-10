@@ -1,3 +1,59 @@
+Commit: a120998139a271cb79e35378c739512f26c62fa7 
+Author: Mark Lawrence <nomad@null.net> Wed, 10 Oct 2007 19:01:00 +0200 
+
+    t/09-db.t
+        Fixed number of tests to be run.
+    
+    CPAN
+        Uploaded as v0.08. Kind of forced due to MySpam dependency on this
+        version.
+
+Commit: 8c44023f11628335ef6bdc32c98fed31ec957b75 
+Author: Mark Lawrence <nomad@null.net> Wed, 10 Oct 2007 17:33:01 +0200 
+
+    * Preliminary support Multi-faceted Table/Column Definitions.
+    
+    The idea behind this is that certain definitions have a 'normal' and a
+    'database' specific setting, and the right one gets automatically used at
+    runtime.
+    
+    For example, say we have a binary column which under SQLite and MySQL the
+    'BLOB' type works fine, but under PostgreSQL we have to use 'BYTEA'.
+    Our column definition can now be like this:
+    
+      [ name => 'bincol', type => 'BLOB', type_pg => 'BYTEA' ]
+    
+    Internally SQL::DB at connect() time tells the tables what kind of
+    database we have (based on the dbi: connection string) and the table
+    objects know which definition to use. 'type_pg' for postgres and 'type' for
+    everything else.
+    
+    So far only implemented for things like the default character set and the
+    mysql ENGINE statement.
+    
+    SQL::DB
+        Next sequence is now seq($name, $count) and the optional $count will
+        increment by that amount and return a list of ($count) unique ids.
+    
+        Now set table database type at connect() time.
+    
+    SQL::DB::Row
+        Detect and croak() if caller attempt to create a class with duplicate
+        column names.
+    
+    SQL::DB::Schema::Table
+        Multifaced definition support for 'type', 'engine', 'default_charset'
+        and 'tablespace'.
+
+Commit: 54c4bab43480306ad7cd9951f4e49e7014853f0e 
+Author: Mark Lawrence <nomad@null.net> Wed, 10 Oct 2007 12:53:58 +0200 
+
+    * Small documentation update to SQL::DB.
+    * Removed useless SQL::DB::Schema::Query::push_bind_values().
+    
+    CPAN
+        Uploaded as v0.07.
+
 Commit: d3755e22be896a8d4ac9bbb988636708c227f5ae 
 Author: Mark Lawrence <nomad@null.net> Wed, 10 Oct 2007 12:08:44 +0200 
 
