@@ -3,82 +3,105 @@ use strict;
 use warnings;
 use base qw(Exporter);
 use Carp qw(carp croak confess);
+use SQL::DB::Schema::Table;
+use SQL::DB::Schema::Query;
+use SQL::DB::Schema::Expr;
+use UNIVERSAL;
+use Exporter;
 
-use SQL::DB::Table;
-use SQL::DB::Query;
-use SQL::DB::Function;
 
-our $VERSION = '0.06';
+our $VERSION = '0.07';
 our $DEBUG;
-our @EXPORT_OK = @SQL::DB::Function::EXPORT_OK;
 
-foreach (@EXPORT_OK) {
-    no strict 'refs';
-    *{$_} = *{'SQL::DB::Function::'.$_};
+our @ISA = qw(Exporter);
+
+our @EXPORT_OK = qw(
+    define_tables
+    coalesce
+    count
+    max
+    min
+    sum
+    cast
+    now
+    nextval
+    currval
+    setval
+);
+
+
+our %table_names;
+
+sub define_tables {
+    foreach my $def (@_) {
+        unless (ref($def) and ref($def) eq 'ARRAY') {
+            croak 'usage: define_tables($arrayref,...)';
+        }
+
+        my $table = SQL::DB::Schema::Table->new(@{$def});
+
+        if (exists($table_names{$table->name})) {
+            croak "Table ". $table->name ." already defined";
+        }
+
+        warn 'debug: defined table '.$table->name if($DEBUG);
+        $table_names{$table->name} = $table;
+    }
+    return;
 }
-
-use Data::Dumper;
-$Data::Dumper::Indent = 1;
 
 
 sub new {
     my $proto = shift;
     my $class = ref($proto) || $proto;
+
     my $self = {
         sqldbs_tables      => [],
         sqldbs_table_names => {},
     };
     bless($self,$class);
 
-    foreach (@_) {
-        unless (ref($_) and ref($_) eq 'ARRAY') {
-            croak 'usage: new($arrayref, $arrayref,...)'
-        }
-        $self->define($_);
+    push(@_, keys %table_names) unless(@_);
+
+    foreach my $name (@_) {
+        $self->associate_table($name);
     }
+
     return $self;
 }
 
 
-sub define {
+sub associate_table {
     my $self = shift;
+    my $name = shift || croak 'usage: associate_table($name)';
 
-    foreach my $def (@_) {
-        unless (ref($def) and ref($def) eq 'ARRAY') {
-            croak 'usage: define($arrayref,...)';
-        }
-
-        my $table = SQL::DB::Table->new(schema => $self, @{$def});
-
-        if (exists($self->{sqldbs_table_names}->{$table->name})) {
-            croak "Table ". $table->name ." already defined";
-        }
-
-        push(@{$self->{sqldbs_tables}}, $table);
-        $self->{sqldbs_table_names}->{$table->name} = $table;
+    my $table = exists($table_names{$name}) ? $table_names{$name} : undef;
+    if (!$table) {
+        croak "table '$name' has not been defined";
     }
+
+    push(@{$self->{sqldbs_tables}}, $table);
+    $self->{sqldbs_table_names}->{$name} = $table;
+
+    warn 'debug: schema associated with table '.$table->name if($DEBUG);
+    $table->setup_schema($self);
     return;
 }
 
 
 sub table {
     my $self = shift;
-    my $name  = shift;
+    my $name  = shift || croak 'usage: table($name)';
 
-    if ($name) {
-        if (!exists($self->{sqldbs_table_names}->{$name})) {
-            confess "Table '$name' has not been defined";
-        }
-        return $self->{sqldbs_table_names}->{$name};
+    if (!exists($self->{sqldbs_table_names}->{$name})) {
+        confess "Table '$name' is not associated with the current schema";
     }
-    confess 'usage: table($name)';
+    return $self->{sqldbs_table_names}->{$name};
 }
 
 
 sub tables {
     my $self = shift;
-    my $name  = shift;
-
     return @{$self->{sqldbs_tables}};
 }
 
@@ -92,8 +115,127 @@ sub arow {
 
 sub query {
     my $self = shift;
-    return SQL::DB::Query->new(@_);
+    return SQL::DB::Schema::Query->new(@_);
 }
+
+
+#
+# Functions
+#
+
+sub do_function {
+    my $name = shift;
+
+    my @vals;
+    my @bind;
+
+    foreach (@_) {
+        if (UNIVERSAL::isa($_, 'SQL::DB::Schema::Expr')) {
+            push(@vals, $_);
+            push(@bind, $_->bind_values);
+        }
+        else {
+            push(@vals, $_);
+        }
+    }
+    return SQL::DB::Schema::Expr->new($name .'('. join(', ',@vals) .')', @bind);
+
+}
+
+
+# FIXME set a flag somewhere so that SQL::DB::Row doesn't create a
+# modifier method
+sub coalesce {
+    scalar @_ >= 2 || croak 'coalesce() requires at least two argument';
+
+    my $new;
+    if (UNIVERSAL::isa($_[0], 'SQL::DB::Schema::Expr')) {
+        $new = $_[0]->_clone();
+    }
+    else {
+        $new = SQL::DB::Schema::Expr->new;
+    }
+    $new->set_val('COALESCE('. join(', ', @_) .')');
+    return $new;
+}
+
+
+sub count {
+    return do_function('COUNT', @_);
+}
+
+
+sub min {
+    return do_function('MIN', @_);
+}
+
+
+sub max {
+    return do_function('MAX', @_);
+}
+
+
+sub sum {
+    return do_function('SUM', @_);
+}
+
+
+sub cast {
+    return do_function('CAST', @_);
+}
+
+
+sub now {
+    return do_function('NOW');
+}
+
+
+sub do_function_quoted {
+    my $name = shift;
+
+    my @vals;
+    my @bind;
+
+    foreach (@_) {
+        if (UNIVERSAL::isa($_, 'SQL::DB::Schema::Expr')) {
+            push(@vals, "'$_'");
+            push(@bind, $_->bind_values);
+        }
+        else {
+            push(@vals, "'$_'");
+        }
+    }
+    return SQL::DB::Schema::Expr->new($name .'('. join(', ',@vals) .')', @bind);
+
+}
+
+
+sub nextval {
+    return do_function_quoted('nextval', @_);
+}
+
+
+sub currval {
+    return do_function_quoted('currval', @_);
+}
+
+
+sub setval {
+    my $expr = SQL::DB::Schema::Expr->new;
+    if (@_ == 2) {
+        $expr->set_val('setval(\''. $_[0] .'\', '.  $_[1] .')');
+    }
+    elsif (@_ == 3) {
+        $expr->set_val('setval(\''. $_[0] .'\', '.  $_[1] .', '.
+                           ($_[2] ? 'true' : 'false') .')');
+    }
+    else {
+        confess 'setval() takes 2 or 3 arguments';
+    }
+
+    return $expr;
+}
+
 
 1;
 __END__
@@ -219,6 +361,13 @@ are writing an Object Mapping Layer or need to produce SQL offline.
 If you need to talk to a real database you are much better off
 interfacing with L<SQL::DB>.
 
+=head1 CLASS SUBROUTINES
+
+=head2 define_tables(@table_definitions)
+
+Define SQL table definitions. @table_definitions must be a list of
+ARRAY references which are passed directly to L<SQL::DB::Schema::Table>.
+
 =head1 METHODS
 
 =head2 new(\@schema)
@@ -289,6 +438,11 @@ your database backend.
 Also note that the order in which the tables are defined matters
 when it comes to foreign keys. See a good SQL book or Google for why.
 
+=head2 associate_table($name)
+
+Associates table with name $name with this schema object. Tables that
+are not associated cannot be queried.
+
 =head2 tables( )
 
 Return a list of objects representing the database
@@ -310,13 +464,13 @@ So a typical database installation might go like this:
     }
 
 The returned objects can also be queried for details about the names
-of the columns but is otherwise not very useful. See L<SQL::DB::Table>
+of the columns but is otherwise not very useful. See L<SQL::DB::Schema::Table>
 for more details.
 
 =head2 table('Table')
 
 Returns an object representing the database table 'Table'. Also see
-L<SQL::DB::Table> for more details.
+L<SQL::DB::Schema::Table> for more details.
 
 =head2 arow('Table')
 
@@ -348,7 +502,7 @@ do the following:
         where  => $dvd->director->name == 'Spielberg'
     );
 
-See L<SQL::DB::ARow> for more details.
+See L<SQL::DB::Schema::ARow> for more details.
 
 =head2 query(key => value, key => value, key => value, ...)
 
@@ -389,7 +543,7 @@ key/value pairs as follows.
 Note: 'from' is not needed because the table information is already
 associated with the columns.
 
-See L<SQL::DB::Query>, L<SQL::DB::Query::Insert>, L<SQL::DB::Query::Select>,...
+See L<SQL::DB::Schema::Query>, L<SQL::DB::Schema::Query::Insert>, L<SQL::DB::Schema::Query::Select>,...
 
 =head1 EXPRESSIONS
 
@@ -398,7 +552,7 @@ $expression is constructed.  Abstract columns and queries are derived
 from an expression class. Using Perl's overload feature they can be
 combined and nested any way to directly map Perl logic to SQL logic.
 
-See L<SQL::DB::Query> for more details.
+See L<SQL::DB::Schema::Query> for more details.
 
 =head1 INTERNAL METHODS
 
@@ -408,6 +562,58 @@ These are used internally but are documented here for completeness.
 
 Create the representation of table 'Table' according to the schema
 in {...definition...}. Each table can only be defined once.
+
+
+=head1 SQL FUNCTIONS
+
+
+=head2 do_function
+
+
+
+=head2 coalesce
+
+
+
+=head2 count
+
+
+
+=head2 min
+
+
+
+=head2 max
+
+
+
+=head2 sum
+
+
+
+=head2 cast
+
+
+
+=head2 now
+
+
+
+=head2 do_function_quoted
+
+
+
+=head2 nextval
+
+
+
+=head2 currval
+
+
+
+=head2 setval
+
+
 
 =head1 SEE ALSO
 
@@ -434,3 +640,4 @@ the Free Software Foundation; either version 2 of the License, or
 =cut
 
 # vim: set tabstop=4 expandtab:
+

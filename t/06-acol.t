@@ -1,9 +1,10 @@
 use strict;
 use warnings;
-use Test::More tests => 33;
+use Test::More tests => 42;
+use Test::Memory::Cycle;
 
-use_ok('SQL::DB::AColumn');
-can_ok('SQL::DB::AColumn', qw/
+use_ok('SQL::DB::Schema::AColumn');
+can_ok('SQL::DB::Schema::AColumn', qw/
     new
     as
     is_null
@@ -39,8 +40,9 @@ package main;
 my $col = FakeCol->new;
 my $arow = FakeARow->new;
 
-my $acol = SQL::DB::AColumn->new($col, $arow);
-isa_ok($acol, 'SQL::DB::AColumn');
+my $acol = SQL::DB::Schema::AColumn->new($col, $arow);
+isa_ok($acol, 'SQL::DB::Schema::AColumn');
+memory_cycle_ok($acol, 'AColumn memory cycle');
 
 foreach my $t (
     [$acol, 't01.fakecol' ],
@@ -52,12 +54,14 @@ foreach my $t (
     [$acol->set('val'), 'fakecol = ?' ],
 
     ){
-    isa_ok($t->[0], 'SQL::DB::AColumn');
+    isa_ok($t->[0], 'SQL::DB::Schema::AColumn');
     isa_ok($t->[0]->_column, 'FakeCol');
     is($t->[0]->_arow, $arow, 'ARow');
     is($t->[0], $t->[1], $t->[1]);
+    memory_cycle_ok($t->[0], 'memory cycle');
 }
 
 is_deeply([$acol->like('%str%')->bind_values], ['%str%'], 'LIKE bind_values');
 is_deeply([$acol->set('val')->bind_values], ['val'], 'SET bind_values');
 
+memory_cycle_ok($acol, 'final memory cycle');

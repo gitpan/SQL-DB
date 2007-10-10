@@ -1,3 +1,122 @@
+Commit: d3755e22be896a8d4ac9bbb988636708c227f5ae 
+Author: Mark Lawrence <nomad@null.net> Wed, 10 Oct 2007 12:08:44 +0200 
+
+    Fixed circular-reference memory leak between ARows and AColumns.
+    
+    Makefile.PL, debian/control
+        Added dependency on Test::Memory::Cycle and libtest-memory-cycle-perl.
+    
+    t/*
+        Test most objects for circular references.
+
+Commit: f06f0e329930c7a9055acfd60937e035e7893e92 
+Author: Mark Lawrence <nomad@null.net> Wed, 10 Oct 2007 09:32:38 +0200 
+
+    SQL::DB::Schema
+        Schema objects are no longer responsible for define()ing tables.
+        $obj->define() has been replaced by the class subroutine
+        define_tables(). This fixes the issue of persisent (or other)
+        environments unecessarily redefining the schema each time an object
+        is created.
+    
+        The new() method now takes an (optional) list of table names and takes
+        the definition from the class as needed.
+    
+    SQL::DB
+        deploy() now calculates the table order based on sql REFERENCES
+        values so that referenced tables exists before the referring
+        column/table is created..
+
+Commit: 8b8eae32cf673bcc85525c8411b10fc0a4c3a9a2 
+Author: Mark Lawrence <nomad@null.net> Mon, 08 Oct 2007 23:51:08 +0200 
+
+    Added support for DBI bind types. Each column can now have a 'bind_type'
+    definition which will be used for INSERT and UPDATE queries. The reason
+    it got implemented this way at the moment is because I needed an SQL_BLOB
+    column with SQLite and they were the only query types that caused me issues.
+    Should it be standard for all query types?
+
+Commit: 92a496ef78c40cb8cf808869c555f0872a270281 
+Author: Mark Lawrence <nomad@null.net> Mon, 08 Oct 2007 17:52:50 +0200 
+
+    SQL::DB
+        In query_as_string() only quote values that are printable, otherwise
+        insert the string *BINARY DATA* into the output.
+    
+    SQL::DB::Row
+        Bugfix: sub new() now correctly set column status as ORIGINAL or
+        MODIFIED based on the initial values. No longer calls
+        new_from_arrayref().
+    
+        Moved _inflate() and _deflate() into the classes themselves. Row is now
+        'invisible' (ie no in the inheritance tree) although that is not the
+        goal.
+    
+        Bugfix: sub q_insert() now correctly handles multiple-column primary
+        keys.
+
+Commit: 56d452512d4ca1d5d12f092a783871e950c6f0b1 
+Author: Mark Lawrence <nomad@null.net> Mon, 08 Oct 2007 13:46:00 +0200 
+
+    SQL::DB::Row
+        Moved new_from_arrayref() directly into the classes instead of being
+        inherited in order to ensure the STATUS condition exists for every
+        column of a new object.
+    
+        SQL::DB::Schema::Column "default" values (or methods) are now set at
+        object instantiation.
+    
+    SQL::DB::Table
+        Use SQL::DB::Row instead of SQL::DB::Object for base of table classes.
+    
+    SQL::DB::Object.
+        Removed.
+
+Commit: 0e69c4f7a0c9f954a9a2be9bfe1239693c272ea8 
+Author: Mark Lawrence <nomad@null.net> Mon, 08 Oct 2007 12:02:21 +0200 
+
+    SQL::DB::Row
+        Bugfix: Now correctly check for inflate condition when defining
+        _deflate() method;
+    
+        new() method renamed to new_from_arrayref().
+    
+        Each class now gets a new() method that takes either a hashref or a list
+        of key/value pairs and in turn calls new_from_arrayref().
+    
+        Each class now gets a q_insert() method (similar to q_update()).
+
+Commit: 7ee91556aeef08c37b3db405655183b44f9aeb3c 
+Author: Mark Lawrence <nomad@null.net> Sun, 07 Oct 2007 16:17:32 +0200 
+
+    SQL::DB
+        Documentation cleanup.
+
+Commit: 3cfe21630f03a77ba6bd6c6f1a3c7ca7ad4e63f2 
+Author: Mark Lawrence <nomad@null.net> Sun, 07 Oct 2007 14:19:30 +0200 
+
+    Added tests for POD coverage.
+    
+    SQL::DB
+        Removed execute(),objects(),fetcho() & fetcho1() methods.
+
+Commit: 5c3708a19e77ca5cbd7ce918d236cc57d578fb65 
+Author: Mark Lawrence <nomad@null.net> Sat, 06 Oct 2007 12:38:05 +0200 
+
+    SQL::DB
+        All $self->{sqldb_dbh} access is now $self->dbh for better override
+        behaviour.
+    
+    Moved all of SQL::DB::Schema::Functions into SQL::DB::Schema.
+
+Commit: 3356d7dd17c1294638e19c32ced1876d30db1349 
+Author: Mark Lawrence <nomad@null.net> Fri, 05 Oct 2007 16:48:25 +0200 
+
+    Moved AColumn, ARow, Column, Table, Function and Query all underneath the
+    SQL::DB::Schema namespace.
+    
+    Added outline documentation to all modules.
+
 Commit: 8a652f903b734c08d9d1906b467771c914597d40 
 Author: Mark Lawrence <nomad@null.net> Thu, 04 Oct 2007 18:32:15 +0200 
 

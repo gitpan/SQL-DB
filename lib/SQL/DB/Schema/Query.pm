@@ -1,7 +1,7 @@
-package SQL::DB::Query;
+package SQL::DB::Schema::Query;
 use strict;
 use warnings;
-use base qw(SQL::DB::Expr);
+use base qw(SQL::DB::Schema::Expr);
 use Carp qw(carp croak confess);
 use UNIVERSAL qw(isa);
 
@@ -43,32 +43,6 @@ sub new {
 }
 
 
-sub push_bind_values {
-    my $self = shift;
-    my @values;
-    foreach my $item (@_) {
-        if (ref($item) && UNIVERSAL::isa($item, 'SQL::DB::Object')) {
-            my @cols = $item->_table->primary_columns;
-            my $colname = $cols[0]->name;
-            push(@values, $item->$colname);
-        }
-        else {
-            push(@values, $item);
-        }
-    }
-    $self->SUPER::push_bind_values(@values);
-}
-
-
-sub arows {
-    my $self = shift;
-    if ($self->{arows}) {
-        return @{$self->{arows}};
-    }
-    return;
-}
-
-
 sub acolumns {
     my $self = shift;
     if ($self->{acolumns}) {
@@ -78,9 +52,18 @@ sub acolumns {
 }
 
 
+sub bind_types {
+    my $self = shift;
+    if ($self->{bind_types}) {
+        return @{$self->{bind_types}};
+    }
+    return;
+}
+
+
 sub exists {
     my $self = shift;
-    return SQL::DB::Expr->new('EXISTS ('. $self .')', $self->bind_values);
+    return SQL::DB::Schema::Expr->new('EXISTS ('. $self .')', $self->bind_values);
 }
 
 
@@ -116,7 +99,7 @@ sub st_where {
 sub sql_where {
     my $self  = shift;
     my $where = shift;
-    if (!$self->{acolumns}) {
+    if (!$self->{acolumns}) { # !SELECT
         $where =~ s/t\d+\.//g;
     }
     return "WHERE\n    " . $where . "\n";
@@ -133,9 +116,7 @@ sub st_insert {
     my $self = shift;
     my $ref  = shift;
 
-#    if (@{$self->{arows}} > 1) {
-#        confess "Can only insert into columns of the same table";
-#    }
+    $self->{bind_types} = [map {$_->_column->bind_type} @$ref];
 
     push(@{$self->{query}}, 'sql_insert', $ref);
 
@@ -157,9 +138,6 @@ sub st_values {
     my $self = shift;
     my $ref  = shift;
 
-#    if (@{$self->{arows}} > 1) {
-#        confess "Can only insert into columns of the same table";
-#    }
 
     push(@{$self->{query}}, 'sql_values', $ref);
     $self->push_bind_values(@{$ref});
@@ -191,8 +169,14 @@ sub st_update {
     @items || croak 'update requires values';
 
     foreach (@items) {
-        if (UNIVERSAL::isa($_, 'SQL::DB::Expr')) {
+        if (UNIVERSAL::isa($_, 'SQL::DB::Schema::Expr')) {
             $self->push_bind_values($_->bind_values);
+            if ($_->can('_column')) {
+                push(@{$self->{bind_types}}, $_->_column->bind_type);
+            }
+            else {
+                push(@{$self->{bind_types}}, undef);
+            }
         }
     }
 
@@ -228,9 +212,9 @@ sub st_select {
     my $ref  = shift;
 
     my @items    = ref($ref) eq 'ARRAY' ? @{$ref} : $ref;
-    my @acolumns = map {UNIVERSAL::isa($_, 'SQL::DB::ARow') ? $_->_columns : $_} @items;
+    my @acolumns = map {UNIVERSAL::isa($_, 'SQL::DB::Schema::ARow') ? $_->_columns : $_} @items;
 
-    $self->push_bind_values(map {UNIVERSAL::isa($_, 'SQL::DB::Expr') ? $_->bind_values : ()} @acolumns);
+    $self->push_bind_values(map {UNIVERSAL::isa($_, 'SQL::DB::Schema::Expr') ? $_->bind_values : ()} @acolumns);
 
     push(@{$self->{acolumns}}, @acolumns);
     push(@{$self->{query}}, 'sql_select', undef);
@@ -290,10 +274,10 @@ sub st_from {
 
     if (UNIVERSAL::isa($ref, 'ARRAY')) {
         foreach (@{$ref}) {
-            if (UNIVERSAL::isa($_, 'SQL::DB::AColumn')) {
+            if (UNIVERSAL::isa($_, 'SQL::DB::Schema::AColumn')) {
                 push(@acols, $_->_reference);
             }
-            elsif (UNIVERSAL::isa($_, 'SQL::DB::ARow')) {
+            elsif (UNIVERSAL::isa($_, 'SQL::DB::Schema::ARow')) {
                 push(@acols, $_);
             }
             else {
@@ -301,10 +285,10 @@ sub st_from {
             }
         }
     }
-    elsif (UNIVERSAL::isa($ref, 'SQL::DB::AColumn')) {
+    elsif (UNIVERSAL::isa($ref, 'SQL::DB::Schema::AColumn')) {
         push(@acols, $ref->_arow);
     }
-    elsif (UNIVERSAL::isa($ref, 'SQL::DB::ARow')) {
+    elsif (UNIVERSAL::isa($ref, 'SQL::DB::Schema::ARow')) {
         push(@acols, $ref);
     }
     else {
@@ -360,7 +344,7 @@ sub st_left_outer_join {st_left_join(@_)};
 sub st_left_join {
     my $self = shift;
     my $arow  = shift;
-    UNIVERSAL::isa($arow, 'SQL::DB::ARow') || confess "join only with ARow";
+    UNIVERSAL::isa($arow, 'SQL::DB::Schema::ARow') || confess "join only with ARow";
     push(@{$self->{query}}, 'sql_left_join', $arow);
     return;
 }
@@ -424,8 +408,8 @@ sub sql_cross_join {
 sub st_union {
     my $self = shift;
     my $ref  = shift;
-    unless(UNIVERSAL::isa($ref, 'SQL::DB::Expr')) {
-        confess "Select UNION must be based on SQL::DB::Expr";
+    unless(UNIVERSAL::isa($ref, 'SQL::DB::Schema::Expr')) {
+        confess "Select UNION must be based on SQL::DB::Schema::Expr";
     }
     push(@{$self->{query}}, 'sql_union', $ref);
     $self->push_bind_values($ref->bind_values);
@@ -443,8 +427,8 @@ sub sql_union {
 sub st_intersect {
     my $self = shift;
     my $ref  = shift;
-    unless(UNIVERSAL::isa($ref, 'SQL::DB::Expr')) {
-        confess "Select INTERSECT must be based on SQL::DB::Expr";
+    unless(UNIVERSAL::isa($ref, 'SQL::DB::Schema::Expr')) {
+        confess "Select INTERSECT must be based on SQL::DB::Schema::Expr";
     }
     push(@{$self->{query}}, 'sql_intersect', $ref);
     $self->push_bind_values($ref->bind_values);
@@ -537,8 +521,8 @@ sub sql_offset {
 sub st_delete {
     my $self = shift;
     my $arow = shift;
-    UNIVERSAL::isa($arow, 'SQL::DB::ARow') ||
-        confess "Can only delete type SQL::DB::ARow";
+    UNIVERSAL::isa($arow, 'SQL::DB::Schema::ARow') ||
+        confess "Can only delete type SQL::DB::Schema::ARow";
     push(@{$self->{query}}, 'sql_delete', $arow);
     return;
 }
@@ -556,4 +540,258 @@ sub sql_delete {
 
 
 __END__
+# vim: set tabstop=4 expandtab:
+
+
+=head1 NAME
+
+SQL::DB::Schema::Query - description
+
+=head1 SYNOPSIS
+
+  use SQL::DB::Schema::Query;
+
+=head1 DESCRIPTION
+
+B<SQL::DB::Schema::Query> is ...
+
+=head1 METHODS
+
+=head2 new
+
+
+
+=head2 push_bind_values
+
+
+
+
+=head2 acolumns
+
+Only valid for select type queries.
+
+=head2 bind_types
+
+Only valid for !select type queries.
+
+
+=head2 exists
+
+
+
+=head2 as_string
+
+
+
+=head2 st_where
+
+
+
+=head2 sql_where
+
+
+
+=head2 st_insert_into
+
+
+
+=head2 st_insert
+
+
+
+=head2 sql_insert
+
+
+
+=head2 st_values
+
+
+
+=head2 sql_values
+
+
+
+=head2 st_update
+
+
+
+=head2 sql_update
+
+
+
+=head2 sql_set
+
+
+
+=head2 st_select
+
+
+
+=head2 sql_select
+
+
+
+=head2 st_distinct
+
+
+
+=head2 st_for_update
+
+
+
+=head2 sql_for_update
+
+
+
+=head2 st_from
+
+
+
+=head2 sql_from
+
+
+
+=head2 st_on
+
+
+
+=head2 sql_on
+
+
+
+=head2 st_inner_join
+
+
+
+=head2 sql_inner_join
+
+
+
+=head2 st_left_outer_join
+
+
+
+=head2 st_left_join
+
+
+
+=head2 sql_left_join
+
+
+
+=head2 st_right_outer_join
+
+
+
+=head2 st_right_join
+
+
+
+=head2 sql_right_join
+
+
+
+=head2 st_full_join
+
+
+
+=head2 st_full_outer_join
+
+
+
+=head2 sql_full_join
+
+
+
+=head2 st_cross_join
+
+
+
+=head2 sql_cross_join
+
+
+
+=head2 st_union
+
+
+
+=head2 sql_union
+
+
+
+=head2 st_intersect
+
+
+
+=head2 sql_intersect
+
+
+
+=head2 st_group_by
+
+
+
+=head2 sql_group_by
+
+
+
+=head2 st_order_by
+
+
+
+=head2 sql_order_by
+
+
+
+=head2 st_limit
+
+
+
+=head2 sql_limit
+
+
+
+=head2 st_offset
+
+
+
+=head2 sql_offset
+
+
+
+=head2 st_delete
+
+
+
+=head2 st_delete_from
+
+
+
+=head2 sql_delete
+
+
+
+=head1 FILES
+
+
+
+=head1 SEE ALSO
+
+L<Other>
+
+=head1 AUTHOR
+
+Mark Lawrence E<lt>nomad@null.netE<gt>
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright (C) 2007 Mark Lawrence <nomad@null.net>
+
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2 of the License, or
+(at your option) any later version.
+
+=cut
+
 # vim: set tabstop=4 expandtab:

@@ -1,12 +1,17 @@
 use strict;
 use warnings;
-use Test::More tests => 5;
+use Test::More tests => 6;
+use Test::Memory::Cycle;
+
 require 't/Schema.pm';
 
-use_ok('SQL::DB::Schema');
-use_ok('SQL::DB::Query');
-can_ok('SQL::DB::Query', qw/
+use SQL::DB::Schema qw(define_tables);
+
+use_ok('SQL::DB::Schema::Query');
+can_ok('SQL::DB::Schema::Query', qw/
     new
+    acolumns
+    bind_types
     st_where
     st_insert_into
     st_insert
@@ -35,7 +40,8 @@ can_ok('SQL::DB::Query', qw/
     st_delete_from
 /);
 
-my $s = SQL::DB::Schema->new(Schema->All);
+define_tables(Schema->All);
+my $s = SQL::DB::Schema->new(qw/artists/);
 
 my $artist = $s->arow('artists');
 
@@ -44,11 +50,20 @@ my $q;
 $q = $s->query(
     select => [$artist->id],
 );
-like($q, qr/^SELECT.*id/sm, $q);
+is($q, 'SELECT
+    t0.id
+', 'select');
+memory_cycle_ok($q, 'memory cycle');
+
 
 $q = $s->query(
     update => [$artist->id->set(4)],
 );
-like($q, qr/^UPDATE.*SET.*id = /sm, $q);
+is($q, 'UPDATE
+    artists
+SET
+    id = ?
+', 'update');
+memory_cycle_ok($q, 'memory cycle');
 
 

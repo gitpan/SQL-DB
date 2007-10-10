@@ -1,4 +1,5 @@
 package Schema;
+use DBI qw(SQL_BLOB);
 
 sub Artist {
     [
@@ -15,6 +16,18 @@ sub Artist {
             columns => 'name',
             unique  => 1,
         ],
+    ];
+}
+
+
+sub Default {
+    [
+        table => 'defaults',
+        class => 'Default',
+        column => [name => 'id',  type => 'INTEGER', primary => 1],
+        column => [name => 'scalar',type => 'INTEGER', default => 1],
+        column => [name => 'sub',type => 'INTEGER', default => sub {1+1}],
+        column => [name => 'binary',type => 'BLOB', bind_type => SQL_BLOB],
     ];
 }
 
@@ -90,7 +103,7 @@ sub ArtistFan {
 
     
 sub All {
-    return (Artist(),CD(),Track(),Fan(),ArtistFan());
+    return (Artist(),Default(),CD(),Track(),Fan(),ArtistFan());
 }
 
 1;
