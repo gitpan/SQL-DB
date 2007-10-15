@@ -1,3 +1,41 @@
+Commit: 1a5494d772da8bb82379d3cc71c4afc384452e4e 
+Author: Mark Lawrence <nomad@null.net> Mon, 15 Oct 2007 13:47:59 +0200 
+
+    SQL::DB::Row
+        * New _modified() method for classes derived from Row.
+        * Don't inflate/deflate undefined columns.
+        * New q_delete() method.
+        * Check for NULL primary columns in q_* methods.
+    
+    SQL::DB::Schema
+        SQL functions: LOWER & UPPER
+    
+    SQL::DB::Column
+        New 'type_pg' and 'bind_type_pg' values for postgres specific
+        definitions.
+    
+    SQL::DB::Table
+        New db_type() method for supporting changes in Column.
+    
+    CPAN
+        Uploaded as version 0.09.
+
+Commit: 7d8778e984d3588acbc59caed7651bdbdf083509 
+Author: Mark Lawrence <nomad@null.net> Fri, 12 Oct 2007 18:53:22 +0200 
+
+    SQL::DB::Cursor
+        New package.
+    
+    Makefile.PL
+        Added DBD::SQLite to the build requirements.
+    
+    SQL::DB
+        Return a Cursor object when fetch() is called in scalar context.
+        Proper binding of values with their bind-types in fetch().
+    
+    t/pod-coverage.t
+        Trust undocumented methods from parent classes.
+
 Commit: a120998139a271cb79e35378c739512f26c62fa7 
 Author: Mark Lawrence <nomad@null.net> Wed, 10 Oct 2007 19:01:00 +0200 
 

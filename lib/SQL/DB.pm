@@ -7,10 +7,10 @@ use Carp qw(carp croak confess);
 use DBI;
 use UNIVERSAL qw(isa);
 use SQL::DB::Row;
-use Class::Accessor::Fast;
+use SQL::DB::Cursor;
 
 
-our $VERSION = '0.08';
+our $VERSION = '0.09';
 our $DEBUG   = 0;
 
 our @EXPORT_OK = @SQL::DB::Schema::EXPORT_OK;
@@ -236,15 +236,34 @@ sub fetch {
     my $query = $self->query(@_);
     my $class = SQL::DB::Row->make_class_from($query->acolumns);
 
+    my $sth;
+    my $rv;
+
+    eval {
+        my @bind_values = $query->bind_values;
+        my @bind_types  = $query->bind_types;
+        my $count = scalar(@bind_values);
+
+        $sth = $self->dbh->prepare("$query");
+        foreach my $i (0..($count-1)) {
+            $sth->bind_param($i+1, $bind_values[$i], $bind_types[$i]);
+        }
+        $rv = $sth->execute;
+    };
+
+    if (!$rv or $@) {
+        croak "DBI::prepare/execute: $DBI::errstr $@: Query was:\n"
+            . $self->query_as_string("$query", $query->bind_values);
+    }
+
     if (wantarray) {
         my $arrayref;
         eval {
-            $arrayref = $self->dbh->selectall_arrayref(
-                        "$query", undef, $query->bind_values);
+            $arrayref = $sth->fetchall_arrayref();
         };
         if (!$arrayref or $@) {
-            croak "DBI::selectall_arrayref: $DBI::errstr $@: Query was:\n"
-                . $query->_as_string;
+            croak "DBI::fetchall_arrayref: $DBI::errstr $@: Query was:\n"
+                . $self->query_as_string("$query", $query->bind_values);
         }
 
         $self->{sqldb_qcount}++;
@@ -253,7 +272,11 @@ sub fetch {
         return map {$class->new_from_arrayref($_)->_inflate} @{$arrayref};
     }
 
-    croak 'sorry, cursor support not yet implemented';
+    $self->{sqldb_qcount}++;
+    carp 'debug: (Cursor call) '.
+          $self->query_as_string("$query", $query->bind_values) if($DEBUG);
+
+    return SQL::DB::Cursor->new($sth, $class);
 }
 
 
@@ -454,20 +477,21 @@ SQL::DB - Perl interface to SQL Databases
 
 =head1 VERSION
 
-0.06. Development release.
+0.09. Development release.
 
 =head1 SYNOPSIS
 
-  use SQL::DB qw(define_tables max min coalesce count nextval currval setval);
+  use SQL::DB qw(define_tables count max);
 
-  define_tables([
+  define_tables(
+    [
       table  => 'addresses',
       class  => 'Address',
       column => [name => 'id',   type => 'INTEGER', primary => 1],
       column => [name => 'kind', type => 'INTEGER'],
       column => [name => 'city', type => 'INTEGER'],
-  ],
-  [
+    ],
+    [
       table  => 'persons',
       class  => 'Person',
       column => [name => 'id',      type => 'INTEGER', primary => 1],
@@ -480,7 +504,8 @@ SQL::DB - Perl interface to SQL Databases
                                     ref  => 'persons(id)',
                                     null => 1],
       index  => 'name',
-  ]);
+    ]
+  );
 
   my $db = SQL::DB->new();
 
