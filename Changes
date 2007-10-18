@@ -1,3 +1,25 @@
+Commit: 7f4e409b243bbc9d7f031f97bfc62ebdf408aa19 
+Author: Mark Lawrence <nomad@null.net> Thu, 18 Oct 2007 11:20:24 +0200 
+
+    SQL::DB
+        Fixed a bind parameters bug which was resulting in the very strange
+        message from DBI "insufficient data in message" in certain cases.
+    
+        Fixed fetch1() to properly detect and report failure.
+    
+    SQL::DB::Row
+        Trivial cleanup of some internal _inflate/_deflate method names.
+    
+    CPAN
+        Uploaded as v0.10.
+
+Commit: 0a4d4a41c92b5fe5bfe06aace9642bf1e6a56f0a 
+Author: Mark Lawrence <nomad@null.net> Tue, 16 Oct 2007 11:17:51 +0200 
+
+    Change testing infrastructure to use File::Temp for secure tempory file
+    creation and deletion. Fixes the bug reported by Andreas König at
+    http://rt.cpan.org/Ticket/Display.html?id=30019
+
 Commit: 1a5494d772da8bb82379d3cc71c4afc384452e4e 
 Author: Mark Lawrence <nomad@null.net> Mon, 15 Oct 2007 13:47:59 +0200 
 
