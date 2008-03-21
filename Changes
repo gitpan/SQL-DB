@@ -1,3 +1,124 @@
+Commit: a7376604a334c9721c42ef1319d3ac82dcd52f3c 
+Author: Mark Lawrence <nomad@null.net> Fri, 21 Mar 2008 09:38:46 +0100 
+
+    SQL::DB
+        Added support for recursive (from Perl's point of view) transactions.
+    
+    SQL::DB::Query
+        Fixed a regular expression issue that wasn't removing the table
+        alias/prefix for non-select statements.
+    
+    CPAN
+        Uploaded as v0.11.
+
+Commit: 62f08702983970abfaa83d2b0ba55483ad31a802 
+Author: Mark Lawrence <nomad@null.net> Mon, 12 Nov 2007 19:24:09 +0100 
+
+    SQL::DB::Row
+        new_from_array() and new() now properly set the original and modified
+        flags on column values.
+    
+        New method: _column_names() returns a list.
+    
+    SQL::DB::Schema
+        New EXISTS() function, maps straight to the SQL EXISTS.  Is uppercase
+        to avoid conflicting with the Perl 'exists'.
+    
+    SQL::DB::Schema::AColumn
+        New is_not_null() method, maps to SQL 'IS NOT NULL'.
+    
+    SQL::DB::Schema::ARow
+        Abstract rows IDs (t0, t1 etc) are now prefixed with the table name,
+        not 't'. Makes the statements much clearer when debugging. The id is
+        now tied to the object and is reused after the object is destroyed.
+        So now statements will generally always have the same query text
+        (provided the query is the same) which is important when wanting to
+        make use of DBI's prepare_cached() method.
+    
+    SQL::DB::Schema::Expr
+        New '*' and '/' overloads.
+    
+        New not_between() 'NOT BETWEEN' method.
+    
+        Bugfix: Now properly produce statements in the correct order for all
+        operators for which order matters. Eg: - / > >= < <=
+
+Commit: 38f8cad4482e1f105faddaaac897a444f224f1a7 
+Author: Mark Lawrence <nomad@null.net> Mon, 12 Nov 2007 19:03:05 +0100 
+
+    New SQL::DB::quickrows() method for dumping object/row values as a table.
+
+Commit: d6e8f9fef3f9f8eee58e4bfb880dd0dac95ac6b1 
+Author: Mark Lawrence <nomad@null.net> Mon, 05 Nov 2007 02:23:48 +0100 
+
+    SQL::DB::Row
+        Bugfix: _hashref() was working it's way through the known columns list,
+        not the method list, generating a hash with missing keys or overwritten
+        values.
+    
+        Bugfix: q_update() was previously unaware of the relationship between
+        columns and ARows. So if you fetched a self join then q_update would
+        not produce the correct updates.
+
+Commit: a450055fd2c3cce34f63ff43ff10b2307a0eb5b1 
+Author: Mark Lawrence <nomad@null.net> Sun, 04 Nov 2007 20:26:34 +0100 
+
+    SQL::DB
+        Sequence rows now automatically created in 'sqldb' for every table.
+    
+    SQL::DB::Row
+        Added support for Expr-based columns to be used for the row definition,
+        in a similar way to AColumns.
+    
+        New _hashref() and _hashref_modified() methods which return key/value
+        versions of the row object.
+    
+        New quickdump() utility method for printing out the object.
+    
+    SQL::DB::Schema
+        New acol() method to generate Expr-based objects. Will probably get
+        renamed shortly to expr()...
+    
+        CASE ... WHEN ... THEN ... ELSE support via the case() function.
+    
+    SQL::DB::Schema::Query
+        New _alias() method, which is in support of Query objects being used in
+        nested selects. Ie SELECT ... FROM ($query) now sets AS properly.
+
+Commit: 4171b4f319267bdd75fa246584fafefb8c276351 
+Author: Mark Lawrence <nomad@null.net> Thu, 01 Nov 2007 13:19:37 +0100 
+
+    Column reference loop detection.
+    
+    When column in table A references table B, and a column in table B also
+    references table A then the tables are undeployable. SQL::DB->deploy() now
+    croaks after too many iterations through the deployment order calculation.
+
+Commit: ea1f8320148a8b64413d220040d73e193463a015 
+Author: Mark Lawrence <nomad@null.net> Wed, 31 Oct 2007 21:31:24 +0100 
+
+    Added new tests for BLOB columns. Some of them currently fail due to what
+    I think is a bug in SQLite. Even when data inserted is bound as SQL_BLOB
+    DBD::SQLite still sets utf8 flag when $dbh->{unicode} is set to true.
+
+Commit: cd9e5ee33e94369786f2eed8840782a331e58112 
+Author: Mark Lawrence <nomad@null.net> Tue, 30 Oct 2007 15:29:54 +0100 
+
+    SQL::DB
+        Simplification of the table deployment order logic. There may have
+        been a bug in the old code (which I couldn't find) but things
+        definately work correctly now.
+
+Commit: a3467da8edd44c5ac18af10fa477d21835ebfc95 
+Author: Mark Lawrence <nomad@null.net> Mon, 29 Oct 2007 12:58:56 +0100 
+
+    SQL::DB
+        Added transaction support via the txn() method. Removed unecessary
+        begin/commit statements from seq().
+    
+    SQL::DB::Query
+        Added select_distinct command.
+
 Commit: 7f4e409b243bbc9d7f031f97bfc62ebdf408aa19 
 Author: Mark Lawrence <nomad@null.net> Thu, 18 Oct 2007 11:20:24 +0200 
 

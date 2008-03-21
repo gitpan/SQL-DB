@@ -2,6 +2,8 @@ package SQL::DB::Row;
 use strict;
 use warnings;
 use Carp qw(croak);
+use Scalar::Util qw(refaddr);
+
 use constant ORIGINAL => 0;
 use constant MODIFIED => 1;
 use constant STATUS   => 2;
@@ -13,14 +15,19 @@ sub make_class_from {
 
     my @methods;
     my @tablecolumns;
+    my $arows = {};
+
+    my $i = 0;
     foreach my $obj (@_) {
         my $method;
         my $set_method;
         if (UNIVERSAL::can($obj, '_column')) {        # AColumn
-            ($method = $obj->_as) =~ s/^t\d+\.//;
+            ($method = $obj->_as) =~ s/(^t\d+\.)|(^\w+\d+\.)//go;
             $set_method = 'set_'. $method;
             push(@methods, [$method, $set_method, $obj->_column]);
-            push(@tablecolumns, $obj->_column->table->name .'.'. $obj->_column->name);
+            push(@tablecolumns, $obj->_column->table->name .'.'.
+                                $obj->_column->name);
+            push(@{$arows->{refaddr($obj->_arow)}}, [$i,$obj->_column]);
         }
         elsif (UNIVERSAL::can($obj, 'table')) {      # Column
             $method = $obj->name;
@@ -29,13 +36,15 @@ sub make_class_from {
             push(@tablecolumns, $obj->table->name .'.'. $obj->name);
         }
         elsif (UNIVERSAL::can($obj, '_as')) {         # Expr
-            $method = $obj->_as;
-            push(@methods, [$method, undef, undef]);
+            $method = $obj->_as || $obj->as_string;
+            $set_method = 'set_'. $method;
+            push(@methods, [$method, $set_method, undef]);
             push(@tablecolumns, $method);
         }
         else {
             croak 'MultiRow takes AColumns, Columns or Exprs: '. ref($obj);
         }
+        $i++;
     }
 
     my $class = $proto .'::'. join('_', @tablecolumns);
@@ -47,10 +56,11 @@ sub make_class_from {
     }
     push(@{$isa}, $proto);
 
+    ${$class.'::_arow_groups'} = [values %$arows] if(keys %$arows);;
 
     my $defaults = {};
 
-    my $i = 0;
+    $i = 0;
     foreach my $def (@methods) {
         # index/position in array
         ${$class.'::_index_'.$def->[0]} = $i;
@@ -75,6 +85,8 @@ sub make_class_from {
                   .'You cannot fetch two columns with the same name';
         }
 
+        push(@{$class.'::_column_names'}, $def->[0]);
+
         # accessor
         *{$class.'::'.$def->[0]} = sub {
             my $self = shift;
@@ -87,16 +99,29 @@ sub make_class_from {
             if (defined(&{$class.'::'.$def->[1]})) {
                 die "double definition";
             }
-            *{$class.'::'.$def->[1]} = sub {
-                my $self = shift;
-                if (!@_) {
-                    croak $def->[1] . ' requires an argument';
-                }
-                my $pos  = ${$class.'::_index_'.$def->[0]};
-                $self->[STATUS]->[$pos] = 1;
-                $self->[MODIFIED]->[$pos] = shift;
-                return;
-            };
+            if ($def->[2]) { # we have a column - record the modification
+                *{$class.'::'.$def->[1]} = sub {
+                    my $self = shift;
+                    if (!@_) {
+                        croak $def->[1] . ' requires an argument';
+                    }
+                    my $pos  = ${$class.'::_index_'.$def->[0]};
+                    $self->[STATUS]->[$pos] = 1;
+                    $self->[MODIFIED]->[$pos] = shift;
+                    return;
+                };
+            }
+            else { # no column, just change the value
+                *{$class.'::'.$def->[1]} = sub {
+                    my $self = shift;
+                    if (!@_) {
+                        croak $def->[1] . ' requires an argument';
+                    }
+                    my $pos  = ${$class.'::_index_'.$def->[0]};
+                    $self->[ORIGINAL]->[$pos] = shift;
+                    return;
+                };
+            }
         }
         $i++;
     }
@@ -126,7 +151,6 @@ sub make_class_from {
         my $proto = shift;
         my $incoming;
 
-
         if (ref($_[0]) and ref($_[0]) eq 'HASH') {
             $incoming = shift;
         }
@@ -134,29 +158,41 @@ sub make_class_from {
             $incoming = {@_};
         }
 
-        my $hash  = {};
-        map {$hash->{$_} = $defaults->{$_}} keys %$defaults;
-        map {$hash->{$_} = $incoming->{$_}} keys %$incoming;
-
         my @status = map {ORIGINAL} (1.. scalar @methods);
 
-        my @array = ();
+        # Set the default values
+        my @original = ();
+        my $hash  = {};
+        map {$hash->{$_} = $defaults->{$_}} keys %$defaults;
+
         while (my ($key,$val) = each %$hash) {
             my $i = ${$class.'::_index_'.$key};
             if (defined($i)) {
-                $status[$i] = MODIFIED;
                 if (ref($val) and ref($val) eq 'CODE') {
-                    $array[$i] = &$val;
+                    $original[$i] = &$val;
                 }
                 else {
-                    $array[$i] = $val;
+                    $original[$i] = $val;
                 }
             }
         }
 
+        # Set the incoming values
+        $hash = {};
+        my @modified = ();
+        map {$hash->{$_} = $incoming->{$_}} keys %$incoming;
+
+        while (my ($key,$val) = each %$hash) {
+            my $i = ${$class.'::_index_'.$key};
+            if (defined($i)) {
+                $status[$i] = MODIFIED;
+                $modified[$i] = $val;
+            }
+        }
+
         my $self  = [
-            [],                        # ORIGINAL
-            \@array,                   # MODIFIED
+            \@original,                # ORIGINAL
+            \@modified,                # MODIFIED
             \@status,                  # STATUS
         ];
     
@@ -166,12 +202,46 @@ sub make_class_from {
     };
 
 
+    *{$class.'::_column_names'} = sub {
+        my $self = shift;
+        return @{$class.'::_column_names'};
+    };
+
+
+    *{$class.'::_hashref'} = sub {
+        my $self = shift;
+        my $hashref = {};
+        
+        my $i = 0;
+        foreach my $def (@methods) {
+            $hashref->{$def->[0]} = $self->[$self->[STATUS]->[$i]]->[$i];
+            $i++;
+        }
+        return $hashref;
+    };
+
+
     *{$class.'::_modified'} = sub {
         my $self = shift;
         my $colname = shift || croak 'usage: _modified($colname)';
         my $i = ${$class.'::_index_'.$colname};
         defined($i) || croak 'Column "'.$colname.'" is not in '.ref($self);
         return $self->[STATUS]->[$i];
+    };
+
+
+    *{$class.'::_hashref_modified'} = sub {
+        my $self = shift;
+        my $hashref = {};
+        
+        my $i = 0;
+        foreach my $def (@methods) {
+            if ($self->[STATUS]->[$i] == MODIFIED) {
+                $hashref->{$def->[0]} = $self->[MODIFIED]->[$i];
+            }
+            $i++;
+        }
+        return $hashref;
     };
 
 
@@ -258,50 +328,95 @@ sub make_class_from {
 
         my @cols = @{$class .'::_columns'};
         
-        my $arows   = {};
-        my $updates = {};
-        my $where   = {};
+        my $arows     = {};
+        my $primary   = {};
+        my $updates   = {};
+        my $where     = {};
 
-        my $i = 0;
-        foreach my $col (@cols) {
-            next unless($col);
+        if (my $_arow_groups = ${$class.'::_arow_groups'}) {
+            my $groupid = 0;
+            foreach my $group (@$_arow_groups) {
+                foreach my $group_item (@$group) {
+                    my ($i,$col) = @$group_item;
+                    my $colname  = $col->name;
 
-            my $colname = $col->name;
-            my $tname   = $col->table->name;
+                    if (!exists($arows->{$groupid})) {
+                        $arows->{$groupid}   = $col->table->arow();
+                        $updates->{$groupid} = [],
+                    }
 
-            if (!exists($arows->{$tname})) {
-                $arows->{$tname}   = $col->table->arow();
-                $updates->{$tname} = [],
+                    if ($col->primary) {
+                        # NULL primary columns can't be used.
+                        if (!defined($self->[$self->[STATUS]->[$i]]->[$i])) {
+                            next;
+                        }
+
+                        $primary->{$groupid} = 1;
+                        if (!$where->{$groupid}) {
+                            $where->{$groupid} =
+                                ($arows->{$groupid}->$colname ==
+                                $self->[$self->[STATUS]->[$i]]->[$i]);
+                        }
+                        else {
+                            $where->{$groupid} = $where->{$groupid} & 
+                                ($arows->{$groupid}->$colname ==
+                                $self->[$self->[STATUS]->[$i]]->[$i]);
+                        }
+                    }
+
+                    if ($self->[STATUS]->[$i] == MODIFIED) {
+                        push(@{$updates->{$groupid}},
+                            $arows->{$groupid}->$colname->set(
+                                        $self->[MODIFIED]->[$i])
+                        );
+                    }
+                }
+                $groupid++;
             }
+        }
+        else {
+            my $i = 0;
+            foreach my $col (@cols) {
+                next unless($col);
 
-            if ($col->primary) {
-                # NULL primary columns can't be used.
-                if (!defined($self->[$self->[STATUS]->[$i]]->[$i])) {
-                    $i++;
-                    next;
+                my $colname = $col->name;
+                my $tname   = $col->table->name;
+
+                if (!exists($arows->{$tname})) {
+                    $arows->{$tname}   = $col->table->arow();
+                    $updates->{$tname} = [],
                 }
 
-                if (!$where->{$tname}) {
-                    $where->{$tname} = ($arows->{$tname}->$colname ==
-                        $self->[$self->[STATUS]->[$i]]->[$i]);
-                }
-                else {
-                    $where->{$tname} = $where->{$tname} & 
-                        ($arows->{$tname}->$colname ==
-                        $self->[$self->[STATUS]->[$i]]->[$i]);
-                }
-            }
+                if ($col->primary) {
+                    # NULL primary columns can't be used.
+                    if (!defined($self->[$self->[STATUS]->[$i]]->[$i])) {
+                        $i++;
+                        next;
+                    }
 
-            if ($self->[STATUS]->[$i] == MODIFIED) {
-                push(@{$updates->{$tname}},
-                    $arows->{$tname}->$colname->set($self->[MODIFIED]->[$i])
-                );
+                    $primary->{$tname} = 1;
+                    if (!$where->{$tname}) {
+                        $where->{$tname} = ($arows->{$tname}->$colname ==
+                            $self->[$self->[STATUS]->[$i]]->[$i]);
+                    }
+                    else {
+                        $where->{$tname} = $where->{$tname} & 
+                            ($arows->{$tname}->$colname ==
+                            $self->[$self->[STATUS]->[$i]]->[$i]);
+                    }
+                }
+
+                if ($self->[STATUS]->[$i] == MODIFIED) {
+                    push(@{$updates->{$tname}},
+                        $arows->{$tname}->$colname->set($self->[MODIFIED]->[$i])
+                    );
+                }
+                $i++;
             }
-            $i++;
         }
 
         my @queries;
-        foreach my $table (keys %{$where}) {
+        foreach my $table (keys %{$primary}) {
             next unless($where->{$table} and @{$updates->{$table}});
             push(@queries, [
                 update => $updates->{$table},
@@ -379,6 +494,27 @@ sub make_class_from {
         return ($arows, @queries);
     };
 
+    *{$class.'::quickdump'} = sub {
+        my $self = shift;
+
+        my $str;
+
+        my $i = 0;
+        foreach my $def (@methods) {
+            my $key = $def->[0] .($self->[STATUS]->[$i] ? '[m]' : '');
+            my $val = $self->[$self->[STATUS]->[$i]]->[$i];
+            if (defined($val) and $val !~ /^[[:print:]]+$/) {
+                $val = '*BINARY DATA*';
+            }
+            else {
+                $val = (defined($val) ? $val : 'NULL');
+            }
+            $str .= sprintf("\%-12s = \%s\n", $key, $val);
+            $i++;
+        }
+        return $str;
+    };
+
     return $class;
 }
 
@@ -411,6 +547,10 @@ array values must be in the same order as the definition of the class.
 
 =head2 new
 
+
+=head2 _hashref
+
+Returns a reference to a hash containing the keys and values of the object.
 
 
 =head2 _inflate

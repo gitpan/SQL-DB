@@ -10,7 +10,7 @@ use SQL::DB::Row;
 use SQL::DB::Cursor;
 
 
-our $VERSION = '0.10';
+our $VERSION = '0.11';
 our $DEBUG   = 0;
 
 our @EXPORT_OK = @SQL::DB::Schema::EXPORT_OK;
@@ -68,6 +68,7 @@ sub connect {
     $self->{sqldb_pass}   = $pass;
     $self->{sqldb_attrs}  = $attrs;
     $self->{sqldb_qcount} = 0;
+    $self->{sqldb_txn}    = 0;
 
     $self->_set_table_types();
 
@@ -112,43 +113,42 @@ sub deploy {
 
     # calculate which tables reference which other tables, and plan the
     # deployment order accordingly.
+    my @tlist = grep {$_->name ne 'sqldb'} $self->tables;
     my @tables;
-    my %name_to_table = (map {$_->name => $_} $self->tables);
-    my %deployed;
-    my $thash;
+    my $deployed = {map {$_->name => 0} @tlist};
 
-    foreach my $t ($self->tables) {
-        my $none = 1;
-        foreach my $c ($t->columns) {
-            if (my $ref = $c->references) {
-                # check for self reference or already deployed
-                next if ($ref->table == $t or $deployed{$ref->name});
-
-                $thash->{$t->name}->{$ref->table->name} = 1;
-                $none = 0;
+    my $max = 0;
+    while (@tlist) {
+        my @newtlist = ();
+        foreach my $t (@tlist) {
+            my $none = 1;
+            foreach my $c ($t->columns) {
+                if (my $ref = $c->references) {
+                    # check for self reference or already deployed
+                    next if ($ref->table == $t or
+                             $deployed->{$ref->table->name});
+                    $none = 0;
+                }
             }
-        }
         
-        if ($none) { # doesn't reference anyone - can deploy first
-            push(@tables, $t);
-            $deployed{$t->name} = 1;
-        }
-    }
-
-    while (my ($t1,$h) =  each %$thash) {
-        while (my ($t2,$val) = each %$h) {
-            next unless($val);
-            if ($deployed{$t2}) { # been deployed, remove this entry
-                delete $h->{$t2};
+            if ($none) { # doesn't reference anyone not already deployed
+                push(@tables, $t);
+                $deployed->{$t->name} = 1;
+            }
+            else {
+                push(@newtlist, $t);
             }
         }
-        if (!keys %$h) {
-            push(@tables, $name_to_table{$t1});
-            $deployed{$t1} = 1;
-            delete $thash->{$t1};
+        @tlist = @newtlist;
+
+        if ($max++ > 2000) {
+            croak 'infinite deployment calculation - reference columns loop?';
         }
     }
 
+    if ($self->table('sqldb')) {
+        unshift(@tables, $self->table('sqldb'));
+    }
 
     TABLES: foreach my $table (@tables) {
         my $sth = $self->dbh->table_info('', '', $table->name, 'TABLE');
@@ -171,6 +171,8 @@ sub deploy {
                 die $self->dbh->errstr . ' query: '. $action;
             }
         }
+
+        $self->create_seq($table->name);
     }
     return 1;
 }
@@ -205,6 +207,7 @@ sub do {
         foreach my $type ($query->bind_types) {
             if ($type) {
                 $sth->bind_param($i, undef, $type);
+                carp 'debug: binding param '.$i.' with '.$type if($DEBUG);
             }
             $i++;
         }
@@ -298,6 +301,59 @@ sub fetch1 {
 }
 
 
+sub txn {
+    my $self = shift;
+    my $subref = shift;
+    (ref($subref) && ref($subref) eq 'CODE') || croak 'usage txn($subref)';
+
+    $self->{sqldb_txn}++;
+
+    if ($self->{sqldb_txn} == 1) {
+        $self->dbh->begin_work;
+        carp 'debug: BEGIN WORK (txn 1)' if($DEBUG);
+    }
+    else {
+        carp 'debug: Begin Work (txn '.$self->{sqldb_txn}.')' if($DEBUG);
+    }
+
+
+    my $result = eval {local $SIG{__DIE__}; &$subref};
+
+    if ($@) {
+        my $tmp = $@;
+        if ($self->{sqldb_txn} == 1) { # top-most txn
+            carp 'debug: ROLLBACK (txn 1)' if($DEBUG);
+            eval {$self->dbh->rollback};
+        }
+        else { # nested txn - die so the outer txn fails
+            warn 'debug: FAIL Work (txn '.$self->{sqldb_txn}.'): '
+                 . $tmp if($DEBUG);
+            $self->{sqldb_txn}--;
+            die $tmp;
+        }
+        $self->{sqldb_txn}--;
+        if (wantarray) {
+            return (undef, $tmp);
+        }
+        return;
+    }
+
+    if ($self->{sqldb_txn} == 1) {
+        carp 'debug: COMMIT (txn 1)' if($DEBUG);
+        $self->dbh->commit;
+    }
+    else {
+        carp 'debug: End Work (txn '.$self->{sqldb_txn}.')' if($DEBUG);
+    }
+    $self->{sqldb_txn}--;
+
+    if (wantarray) {
+        return (1);
+    }
+    return 1;
+}
+
+
 sub create_seq {
     my $self = shift;
     my $name = shift || croak 'usage: $db->create_seq($name)';
@@ -314,7 +370,7 @@ sub create_seq {
         }) {
         return 1;
     }
-    warn "CreateSequence: $@";
+    croak "create_seq: $@";
     return;
 }
 
@@ -330,7 +386,6 @@ sub seq {
 
     $self->{sqldb_dbi} || croak 'Must be connected before calling seq';
 
-    $self->dbh->begin_work;
     my $sqldb = SQL::DB::Schema::ARow::sqldb->new;
     my $seq;
     my $no_updates;
@@ -349,15 +404,7 @@ sub seq {
             for_update => ($self->{sqldb_dbi} !~ m/sqlite/i),
         );
 
-        if (!$seq) {
-            my $q = $self->query(
-                select     => [$sqldb->val],
-                from       => $sqldb,
-                where      => $sqldb->name == $name,
-                for_update => ($self->{sqldb_dbi} !~ m/sqlite/i),
-            );
-            croak "Can't find sequence $name. Query was ". $q->_as_string unless($seq);
-        }
+        croak "Can't find sequence '$name'" unless($seq);
 
         $no_updates = $self->do(
             update  => [$sqldb->val->set($seq->val + $count)],
@@ -372,7 +419,6 @@ sub seq {
 
     if ($@ or !$no_updates) {
         my $tmp = $@;
-        eval {$self->dbh->rollback;};
 
         if ($self->{sqldb_dbi} =~ m/mysql/i) {
             $self->dbh->do('UNLOCK TABLES');
@@ -381,8 +427,6 @@ sub seq {
         croak "seq: $tmp";
     }
 
-
-    $self->dbh->commit;
 
     if (wantarray) {
         my $start = $seq->val + 1;
@@ -450,6 +494,29 @@ sub qcount {
 }
 
 
+sub quickrows {
+    my $self = shift;
+    return unless(@_);
+
+    my @keys = $_[0]->_column_names;
+    my $c = join(' ', map {'%-'.(length($_)+ 2).'.'
+                           .(length($_)+ 2).'s'} @keys) . "\n";
+
+    my $str = sprintf($c, @keys);
+
+    foreach my $row (@_) {
+        my @values = map {$row->$_} @keys;
+        my @print = map {
+            !defined($_) ?
+            'NULL' :
+            ($_ !~ m/^[[:print:]]*$/ ? '*BINARY*' : $_)
+        } @values;
+
+        $str .= sprintf($c, @print);
+    }
+    return $str;
+}
+    
 
 sub disconnect {
     my $self = shift;
@@ -462,11 +529,11 @@ sub disconnect {
 }
 
 
-DESTROY {
-    my $self = shift;
-    $self->disconnect;
-    return;
-}
+#DESTROY {
+#    my $self = shift;
+#    $self->disconnect;
+#    return;
+#}
 
 
 1;
@@ -478,7 +545,7 @@ SQL::DB - Perl interface to SQL Databases
 
 =head1 VERSION
 
-0.10. Development release.
+0.11. Development release.
 
 =head1 SYNOPSIS
 
@@ -558,8 +625,6 @@ SQL::DB - Perl interface to SQL Databases
   foreach my $item (@items) {
       print $item->name, '(',$item->age,') lives in ', $item->city, "\n";
   }
-
-  return @items # this line for the automatic test
 
 =head1 DESCRIPTION
 
@@ -681,9 +746,29 @@ Similar to fetch() but always returns only the first object from
 the result set. All other rows (if any) can not be retrieved.
 You should only use this method if you know/expect one result.
 
+=head2 txn(&coderef)
+
+Runs the code in &coderef as an SQL transaction. If &coderef does not
+raise any exceptions then the transaction is commited, otherwise it is
+rolled back.
+
+In scalar context returns true/undef on sucess/failure. In array context
+returns (true/undef, $errstr) on success/failure.
+
+This method can be called recursively, but any sub-transaction failure
+will always result in the outer-most transaction also being rolled back.
+
 =head2 qcount
 
 Returns the number of successful queries that have been run.
+
+=head2 quickrows(@objs)
+
+Returns a string containing the column values of @objs in a tabular
+format. Useful for having a quick look at what the database has returned:
+
+    my @objs = $db->fetch(....);
+    warn $db->quickrows(@objs);
 
 =head2 create_seq($name)
 

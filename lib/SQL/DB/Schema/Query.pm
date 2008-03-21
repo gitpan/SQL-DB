@@ -12,14 +12,12 @@ use UNIVERSAL qw(isa);
 sub new {
     my $proto = shift;
     my $class = ref($proto) || $proto;
+    @_ || confess "usage: ". __PACKAGE__ ."->new(\@statements)";
+
     my $self = $proto->SUPER::new; # Get an Expr-based object
     bless($self, $class);
 
     $self->{is_select} = $_[0] =~ m/^select/i;
-
-    unless (@_) {
-        confess "usage: ". __PACKAGE__ ."->new(\@statements)";
-    }
 
     $self->{query} = [];
 
@@ -27,7 +25,7 @@ sub new {
         my $action = 'st_'.$key;
 
         unless($self->can($action)) {
-            confess "Unknown command: $key";
+            confess "Unknown command: $key. Next is:" .(shift).' '.(shift);
         }
 
         my $val    = shift;
@@ -35,10 +33,6 @@ sub new {
     }
 
     $self->multi(1);
-
-    if (wantarray()) {
-        return ("$self", $self->bind_values);
-    }
     return $self;
 }
 
@@ -76,9 +70,18 @@ sub as_string {
         $s .= $self->$stm($val);    
     }
     unless ($self->{is_select}) {
-        $s =~ s/t\d+\.//g;
+        $s =~ s/\w+\d+\.//go;
     }
     return $s;
+}
+
+
+sub _alias {
+    my $self = shift;
+    if (!$self->{tid}) {
+        $self->{tid} = $SQL::DB::Schema::ARow::tcount->{Query}++;
+    }
+    return 't'.$self->{tid};
 }
 
 
@@ -99,9 +102,6 @@ sub st_where {
 sub sql_where {
     my $self  = shift;
     my $where = shift;
-    if (!$self->{acolumns}) { # !SELECT
-        $where =~ s/t\d+\.//g;
-    }
     return "WHERE\n    " . $where . "\n";
 }
 
@@ -223,6 +223,21 @@ sub st_select {
 }
 
 
+sub st_distinct {
+    my $self = shift;
+    $self->{distinct} = shift;
+    return;
+}
+
+
+sub st_select_distinct {
+    my $self = shift;
+    $self->{distinct} = 1;
+    $self->st_select(@_);
+    return;
+}
+
+
 sub sql_select {
     my $self = shift;
     my $ref  = shift;
@@ -240,13 +255,6 @@ sub sql_select {
     $s .= "\n    " .join(",\n    ", @{$self->{acolumns}});
 
     return $s ."\n";
-}
-
-
-sub st_distinct {
-    my $self = shift;
-    $self->{distinct} = shift;
-    return;
 }
 
 
@@ -275,24 +283,37 @@ sub st_from {
     if (UNIVERSAL::isa($ref, 'ARRAY')) {
         foreach (@{$ref}) {
             if (UNIVERSAL::isa($_, 'SQL::DB::Schema::AColumn')) {
-                push(@acols, $_->_reference);
+                push(@acols, $_->_reference->_table_name .' AS '.
+                             $_->_reference->_alias);
             }
             elsif (UNIVERSAL::isa($_, 'SQL::DB::Schema::ARow')) {
-                push(@acols, $_);
+                push(@acols, $_->_table_name .' AS '. $_->_alias);
+            }
+            elsif (UNIVERSAL::isa($_, __PACKAGE__)) {
+                my $str = $_->as_string;
+                $str =~ s/^/    /gm;
+                push(@acols, "(\n".$str.') AS '. $_->_alias);
+                $self->push_bind_values($_->bind_values);
             }
             else {
-                croak "Invalid from object: $_";
+                push(@acols, $_);
             }
         }
     }
     elsif (UNIVERSAL::isa($ref, 'SQL::DB::Schema::AColumn')) {
-        push(@acols, $ref->_arow);
+        push(@acols, $ref->_arow->_table_name .' AS '. $ref->_arow->_alias);
     }
     elsif (UNIVERSAL::isa($ref, 'SQL::DB::Schema::ARow')) {
-        push(@acols, $ref);
+        push(@acols, $ref->_table_name .' AS '. $ref->_alias);
+    }
+    elsif (UNIVERSAL::isa($ref, __PACKAGE__)) {
+        my $str = $ref->as_string;
+        $str =~ s/^/    /gm;
+        push(@acols, "(\n".$str.') AS '. $ref->_alias);
+        $self->push_bind_values($ref->bind_values);
     }
     else {
-        croak "Invalid from object: $ref";
+        push(@acols, $_);
     }
 
     push(@{$self->{query}}, 'sql_from', \@acols);
@@ -304,8 +325,7 @@ sub sql_from {
     my $self = shift;
     my $ref  = shift;
 
-    return "FROM\n    ". join(",\n    ",
-                     map {$_->_table_name. ' AS '. $_->_alias} @{$ref}) ."\n";
+    return "FROM\n    ". join(",\n    ", @$ref) ."\n";
 }
 
 
@@ -627,9 +647,11 @@ Only valid for !select type queries.
 
 
 
+
 =head2 sql_select
 
 
+=head2 st_select_distinct
 
 =head2 st_distinct
 

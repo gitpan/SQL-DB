@@ -1,6 +1,6 @@
 use strict;
 use warnings;
-use Test::More tests => 52;
+use Test::More tests => 61;
 
 use_ok('SQL::DB::Schema::Expr');
 
@@ -19,6 +19,7 @@ my $ce1 = SQL::DB::Schema::Expr->new($e1 & $e2);
 my $ce2 = SQL::DB::Schema::Expr->new($e1 | $e2);
 my $ce3 = $ce1 & $ce2;
 
+is($e1->as_string, 'e1', 'e1 is e1');
 
 
 # Just the basic operators
@@ -35,8 +36,16 @@ foreach (
     [$e1 > 1,  'e1 > ?'],
     [$e1 >= 1, 'e1 >= ?'],
     [$e1 <= 1, 'e1 <= ?'],
+    [1 > $e1,  '? > e1'],
+    [1 < $e1,  '? < e1'],
+    [1 >= $e1, '? >= e1'],
+    [1 <= $e1, '? <= e1'],
     [$e1 + 1,  'e1 + ?'],
     [$e1 - 1,  'e1 - ?'],
+    [1 - $e1,  '? - e1'],
+    [$e1 * 1,  'e1 * ?'],
+    [$e1 / 1,  'e1 / ?'],
+    [1 / $e1,  '? / e1'],
     [$e1 == $e2, 'e1 = e2'],
     [$e1 == $e2, 'e1 = e2'],
     [$e1 eq $e2, 'e1 = e2'],
