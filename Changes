@@ -1,3 +1,33 @@
+Commit: 08a40dffd0da43ad4a5bc969a4bf55a22381cce3 
+Author: Mark Lawrence <nomad@null.net> Tue, 25 Mar 2008 23:50:19 +0100 
+
+    SQL::DB
+        deploy() now run as a transaction.
+    
+        _nopc (no prepare_cached) methods created for do(), fetch() and
+        fetch1(). The original methods now all use prepare_cached by default.
+    
+        Call $sth->finish on do() and fetch1() methods. Should get rid of the
+        "Statement handle still Active" messages which caused v0.11 to fail
+        for every CPAN tester. I can't reproduce the problem locally so this is
+        a bit of a guess.
+    
+    SQL::DB::Cursor
+        New internal method "_finish()" to allow SQL::DB->fetch1() to finish
+        off the statement handle after the first row is retrieved.
+    
+    All
+        Copyright for 2008.
+    
+    CPAN
+        Uploaded as v0.12.
+
+Commit: 918fe71acbe5553379cda9140cf13b133e11136c 
+Author: Mark Lawrence <nomad@null.net> Tue, 25 Mar 2008 11:50:48 +0100 
+
+    SQL::DB
+        Reduced fetch1() down to a simple fetch()->next.
+
 Commit: a7376604a334c9721c42ef1319d3ac82dcd52f3c 
 Author: Mark Lawrence <nomad@null.net> Fri, 21 Mar 2008 09:38:46 +0100 
 
