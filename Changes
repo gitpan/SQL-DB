@@ -1,3 +1,25 @@
+Commit: a2768bc36bb2cd9d04f16e459efed52a4f5c5c62 
+Author: Mark Lawrence <nomad@null.net> Fri, 28 Mar 2008 15:53:40 +0100 
+
+    SQL::DB
+        Replace the horrible txn() return type (a two-item list) by a
+        single Return::Value object. Should prevent people (ie me in
+        t/12-txn.t) from doing silly things like "if ($db->txn(...)) { }"
+        which of course is always true. If only DBI had used something like
+        this...
+    
+    Makefile.PL, debian/control
+        Require Return::Value.
+    
+    CPAN
+        Uploaded as v0.13.
+
+Commit: 144bb351757686fba990de5cee6be65024bb7bc3 
+Author: Mark Lawrence <nomad@null.net> Fri, 28 Mar 2008 15:12:03 +0100 
+
+    t/*
+        Moved the database population routines from live.t into TestList.pm
+
 Commit: 08a40dffd0da43ad4a5bc969a4bf55a22381cce3 
 Author: Mark Lawrence <nomad@null.net> Tue, 25 Mar 2008 23:50:19 +0100 
 
