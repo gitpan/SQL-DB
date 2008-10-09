@@ -3,7 +3,7 @@ use 5.006;
 use strict;
 use warnings;
 use base qw(SQL::DB::Schema);
-use Carp qw(carp croak confess);
+use Carp qw(carp croak confess cluck);
 use DBI;
 use UNIVERSAL qw(isa);
 use Return::Value;
@@ -11,8 +11,7 @@ use SQL::DB::Row;
 use SQL::DB::Cursor;
 
 
-our $VERSION = '0.13';
-our $DEBUG   = 0;
+our $VERSION = '0.14';
 
 our @EXPORT_OK = @SQL::DB::Schema::EXPORT_OK;
 foreach (@EXPORT_OK) {
@@ -38,6 +37,7 @@ sub _set_table_types {
     foreach my $table ($self->tables) {
         $table->set_db_type($type);
     }
+    return;
 }
 
 
@@ -52,10 +52,38 @@ sub new {
 }
 
 
+sub set_debug {
+    my $self = shift;
+    $self->{sqldb_debug} = shift;
+    return;
+}
+
+
+sub debug {
+    my $self = shift;
+    return $self->{sqldb_debug};
+}
+
+
+sub set_sqldebug {
+    my $self = shift;
+    $self->{sqldb_sqldebug} = shift;
+    return;
+}
+
+
+sub sqldebug {
+    my $self = shift;
+    return $self->{sqldb_sqldebug};
+}
+
+
 sub connect {
     my $self = shift;
 
     my ($dbi,$user,$pass,$attrs) = @_;
+    $attrs->{PrintError} = 0;
+    $attrs->{RaiseError} = 1;
 
     if (my $dbh = DBI->connect($dbi,$user,$pass,$attrs)) {
         $self->{sqldb_dbh} = $dbh;
@@ -73,8 +101,8 @@ sub connect {
 
     $self->_set_table_types();
 
-    warn "debug: connected to $dbi" if($DEBUG);
-    return;
+    warn "debug: connected to $dbi" if($self->{sqldb_debug});
+    return $self->{sqldb_dbh};
 }
 
 
@@ -98,8 +126,8 @@ sub connect_cached {
 
     $self->_set_table_types();
 
-    warn "debug: connect_cached to $dbi" if($DEBUG);
-    return;
+    warn "debug: connect_cached to $dbi" if($self->{sqldb_debug});
+    return $self->{sqldb_dbh};
 }
 
 
@@ -109,43 +137,66 @@ sub dbh {
 }
 
 
-sub deploy {
-    my $self = shift;
+# calculate which tables reference which other tables, and plan the
+# deployment order accordingly.
+sub _deploy_order {
+    my $self     = shift;
+    my @src      = grep {$_->name ne 'sqldb'} $self->tables;
+    my $deployed = {};
+    my @ordered  = ();
+    my $count    = 0;
+    my $limit    = scalar @src + 10;
 
-    # calculate which tables reference which other tables, and plan the
-    # deployment order accordingly.
-    my @tlist = grep {$_->name ne 'sqldb'} $self->tables;
-    my @tables;
-    my $deployed = {map {$_->name => 0} @tlist};
+    while (@src) {
+        if ($count++ > $limit) {
+            die 'Long deployment calculation - reference columns loop?';
+        }
 
-    my $max = 0;
-    while (@tlist) {
-        my @newtlist = ();
-        foreach my $t (@tlist) {
-            my $none = 1;
-            foreach my $c ($t->columns) {
-                if (my $ref = $c->references) {
-                    # check for self reference or already deployed
-                    next if ($ref->table == $t or
-                             $deployed->{$ref->table->name});
-                    $none = 0;
+        my @newsrc = ();
+        foreach my $table (@src) {
+            my $deployable = 1;
+            foreach my $c ($table->columns) {
+                if (my $foreignc = $c->references) {
+                    if ($foreignc->table == $table or # self reference
+                        $deployed->{$foreignc->table->name}) {
+                        next;
+                    }
+                    $deployable = 0;
                 }
             }
         
-            if ($none) { # doesn't reference anyone not already deployed
-                push(@tables, $t);
-                $deployed->{$t->name} = 1;
+            if ($deployable) {
+                warn "debug: ".$table->name.' => deploy list ' if($self->{sqldb_sqldebug});
+                push(@ordered, $table);
+                $deployed->{$table->name} = 1;
             }
             else {
-                push(@newtlist, $t);
+                push(@newsrc, $table);
             }
         }
-        @tlist = @newtlist;
+        @src = @newsrc;
 
-        if ($max++ > 2000) {
-            croak 'infinite deployment calculation - reference columns loop?';
-        }
     }
+    return @ordered;
+}
+
+
+sub deploy_sql {
+    my $self   = shift;
+    my $sql    = '';
+
+    foreach my $table ($self->_deploy_order) {
+        $sql .= join("\n", $table->sql_create) . "\n";
+    }
+    return $sql;        
+}
+
+
+sub deploy {
+    my $self = shift;
+    $self->dbh || croak 'cannot deploy() before connect()';
+
+    my @tables = $self->_deploy_order;
 
     if ($self->table('sqldb')) {
         unshift(@tables, $self->table('sqldb'));
@@ -154,7 +205,7 @@ sub deploy {
     # Faster to do all of this inside a BEGIN/COMMIT block on
     # things like SQLite, and better that we deploy all or nothing
     # anyway.
-    $self->txn(sub{
+    my $res = $self->txn(sub{
         TABLES: foreach my $table (@tables) {
             my $sth = $self->dbh->table_info('', '', $table->name, 'TABLE');
             if (!$sth) {
@@ -170,7 +221,7 @@ sub deploy {
             }
 
             foreach my $action ($table->sql_create) {
-                warn "debug: $action" if($DEBUG);
+                warn "debug: $action" if($self->{sqldb_sqldebug});
                 my $res;
                 eval {$res = $self->dbh->do($action);};
                 if (!$res or $@) {
@@ -178,25 +229,57 @@ sub deploy {
                 }
             }
 
+        }
+    });
+
+    croak $res unless($res);
+
+    # Do this in a separate transaction because PostgreSQL doesn't believe
+    # the tables exist until the above transaction is committed.
+    $res = $self->txn(sub{
+        foreach my $table (@tables) {
             $self->create_seq($table->name);
         }
     });
 
+    croak $res unless($res);
     return 1;
 }
 
 
+sub _undeploy {
+    my $self = shift;
+    $self->dbh || croak 'cannot _undeploy() before connect()';
+
+    (my $type = lc($self->{sqldb_dbi})) =~ s/^dbi:(.*?):.*/$1/;
+    $type || confess 'bad/missing dbi: definition';
+
+    foreach my $table ($self->tables) {
+        my $res;
+        my $action = 'DROP TABLE '.$table->name.
+            ($type eq 'pg' ? ' CASCADE' : '');
+        eval {$res = $self->dbh->do($action);};
+        if (!$res or $@) {
+            my $err = $self->dbh->errstr;
+            if($err !~ /(no such table)|(does not exist)|(Unknown table)/i) {
+                croak $err . ' query: '. $action;
+            }
+        }
+    }
+    return 1;
+}
+
 
 sub query_as_string {
     my $self = shift;
-    my $sql  = shift || croak 'query_as_string requires an argument';
+    my $sql  = shift || confess 'query_as_string requires an argument';
     
     foreach (@_) {
-        if (defined($_) and $_ !~ /^[[:print:]]+$/) {
+        if (defined($_) and $_ =~ /[^[:graph:][:space:]]/) {
             $sql =~ s/\?/*BINARY DATA*/;
         }
         else {
-            my $quote = $self->dbh->quote($_);
+            my $quote = $self->dbh->quote("$_"); # make sure it is a string
             $sql =~ s/\?/$quote/;
         }
     }
@@ -216,7 +299,7 @@ sub _do {
         foreach my $type ($query->bind_types) {
             if ($type) {
                 $sth->bind_param($i, undef, $type);
-                carp 'debug: binding param '.$i.' with '.$type if($DEBUG);
+                carp 'debug: binding param '.$i.' with '.$type if($self->{sqldb_debug} && $self->{sqldb_debug} > 1);
             }
             $i++;
         }
@@ -225,12 +308,13 @@ sub _do {
     };
 
     if ($@ or !defined($rv)) {
+        cluck "debug: croaking " if($self->{sqldb_debug});
         croak "$@: Query was:\n"
             . $self->query_as_string("$query", $query->bind_values);
     }
 
     carp 'debug: '. $self->query_as_string("$query", $query->bind_values)
-         ." /* Result: $rv */" if($DEBUG);
+         ." /* Result: $rv */" if($self->{sqldb_sqldebug});
 
     $self->{sqldb_qcount}++;
     return $rv;
@@ -239,12 +323,14 @@ sub _do {
 
 sub do {
     my $self = shift;
+    $self->dbh || croak 'cannot do before connect()';
     return $self->_do('prepare_cached', @_);
 }
 
 
 sub do_nopc {
     my $self = shift;
+    $self->dbh || croak 'cannot do before connect()';
     return $self->_do('prepare', @_);
 }
 
@@ -253,7 +339,11 @@ sub _fetch {
     my $self    = shift;
     my $prepare = shift || croak '_fetch($prepare)';
     my $query   = $self->query(@_);
-    my $class   = SQL::DB::Row->make_class_from($query->acolumns);
+    my $class   = eval {SQL::DB::Row->make_class_from($query->acolumns);};
+
+    if ($@) {
+        confess "SQL::DB::Row->make_class_from failed: $@";
+    }
 
     my $sth;
     my $rv;
@@ -271,7 +361,7 @@ sub _fetch {
     };
 
     if ($@ or !defined($rv)) {
-        croak "$@: Query was:\n"
+        confess "$@: Query was:\n"
             . $self->query_as_string("$query", $query->bind_values);
     }
 
@@ -287,13 +377,15 @@ sub _fetch {
 
         $self->{sqldb_qcount}++;
         carp 'debug: (Rows: '. scalar @$arrayref .') '.
-              $self->query_as_string("$query", $query->bind_values) if($DEBUG);
+              $self->query_as_string("$query", $query->bind_values)
+              if($self->{sqldb_sqldebug});
         return map {$class->new_from_arrayref($_)->_inflate} @{$arrayref};
     }
 
     $self->{sqldb_qcount}++;
     carp 'debug: (Cursor call) '.
-          $self->query_as_string("$query", $query->bind_values) if($DEBUG);
+          $self->query_as_string("$query", $query->bind_values)
+          if($self->{sqldb_sqldebug});
 
     return SQL::DB::Cursor->new($sth, $class);
 }
@@ -301,18 +393,21 @@ sub _fetch {
 
 sub fetch {
     my $self = shift;
+    $self->dbh || croak 'cannot fetch before connect()';
     return $self->_fetch('prepare_cached', @_);
 }
 
 
 sub fetch_nopc {
     my $self = shift;
+    $self->dbh || croak 'cannot fetch before connect()';
     return $self->_fetch('prepare', @_);
 }
 
 
 sub fetch1 {
     my $self   = shift;
+    $self->dbh || croak 'cannot fetch before connect()';
     my $cursor = $self->_fetch('prepare_cached', @_);
     my $obj    = $cursor->next;
     $cursor->_finish();
@@ -322,6 +417,7 @@ sub fetch1 {
 
 sub fetch1_nopc {
     my $self   = shift;
+    $self->dbh || croak 'cannot fetch before connect()';
     my $cursor = $self->_fetch('prepare', @_);
     my $obj    = $cursor->next;
     $cursor->_finish();
@@ -334,14 +430,21 @@ sub txn {
     my $subref = shift;
     (ref($subref) && ref($subref) eq 'CODE') || croak 'usage txn($subref)';
 
+    my $rc;
     $self->{sqldb_txn}++;
 
     if ($self->{sqldb_txn} == 1) {
-        $self->dbh->begin_work;
-        carp 'debug: BEGIN WORK (txn 1)' if($DEBUG);
+        eval {$rc = $self->dbh->begin_work;};
+        if (!$rc) {
+            my $err = $self->dbh->errstr;
+            carp $err;
+            return failure $err;
+        }
+        carp 'debug: BEGIN WORK (txn 1)' if($self->{sqldb_sqldebug});
     }
     else {
-        carp 'debug: Begin Work (txn '.$self->{sqldb_txn}.')' if($DEBUG);
+        carp 'debug: Begin Work (txn '.$self->{sqldb_txn}.')'
+        if($self->{sqldb_sqldebug});
     }
 
 
@@ -350,12 +453,12 @@ sub txn {
     if ($@) {
         my $tmp = $@;
         if ($self->{sqldb_txn} == 1) { # top-most txn
-            carp 'debug: ROLLBACK (txn 1)' if($DEBUG);
+            carp 'debug: ROLLBACK (txn 1)' if($self->{sqldb_sqldebug});
             eval {$self->dbh->rollback};
         }
         else { # nested txn - die so the outer txn fails
-            warn 'debug: FAIL Work (txn '.$self->{sqldb_txn}.'): '
-                 . $tmp if($DEBUG);
+            carp 'debug: FAIL Work (txn '.$self->{sqldb_txn}.'): '
+                 . $tmp if($self->{sqldb_sqldebug});
             $self->{sqldb_txn}--;
             die $tmp;
         }
@@ -364,15 +467,20 @@ sub txn {
     }
 
     if ($self->{sqldb_txn} == 1) {
-        carp 'debug: COMMIT (txn 1)' if($DEBUG);
-        $self->dbh->commit;
+        carp 'debug: COMMIT (txn 1)' if($self->{sqldb_sqldebug});
+        $rc = $self->dbh->commit;
+        carp $self->dbh->errstr unless($rc);
     }
     else {
-        carp 'debug: End Work (txn '.$self->{sqldb_txn}.')' if($DEBUG);
+        carp 'debug: End Work (txn '.$self->{sqldb_txn}.')'
+        if($self->{sqldb_sqldebug});
     }
     $self->{sqldb_txn}--;
 
-    return 1;
+    if ($result or (ref($result) && ref($result) eq 'Return::Value')) {
+        return $result;
+    }
+    return success $result;
 }
 
 
@@ -384,16 +492,23 @@ sub create_seq {
 
     my $s = SQL::DB::Schema::ARow::sqldb->new;
 
-    if (eval {
-        $self->do(
-            insert  => [$s->name, $s->val],
-            values  => [$name, 0],
-        );
-        }) {
-        return 1;
+    my $exists = $self->fetch1(
+        select => $s->name,
+        from   => $s,
+        where  => $s->name == $name,
+    );
+
+    if (!$exists) {
+        eval {
+            $self->do(
+                insert  => [$s->name, $s->val],
+                values  => [$name, 0],
+            );
+        };
+        
+        croak "create_seq: $@" if($@);
     }
-    croak "create_seq: $@";
-    return;
+    return 1;
 }
 
 
@@ -467,9 +582,7 @@ sub insert {
         }
         my ($arows, @inserts) = $obj->q_insert; # reference hand-holding
         foreach (@inserts) {
-            if (!$self->do(@$_)) {
-                croak 'INSERT for '. ref($obj) . ' object failed';
-            }
+            $self->do(@$_);
         }
     }
     return 1;
@@ -484,9 +597,7 @@ sub update {
         }
         my ($arows, @updates) = $obj->q_update; # reference hand-holding
         foreach (@updates) {
-            if ($self->do(@$_) != 1) {
-                croak 'UPDATE for '. ref($obj) . ' object failed';
-            }
+            $self->do(@$_);
         }
     }
     return 1;
@@ -501,9 +612,7 @@ sub delete {
         }
         my ($arows, @deletes) = $obj->q_delete; # reference hand-holding
         foreach (@deletes) {
-            if ($self->do(@$_) != 1) {
-                croak 'DELETE for '. ref($obj) . ' object failed';
-            }
+            $self->do(@$_);
         }
     }
     return 1;
@@ -531,7 +640,7 @@ sub quickrows {
         my @print = map {
             !defined($_) ?
             'NULL' :
-            ($_ !~ m/^[[:print:]]*$/ ? '*BINARY*' : $_)
+            ($_ =~ m/[^[:graph:][:print:]]/ ? '*BINARY*' : $_)
         } @values;
 
         $str .= sprintf($c, @print);
@@ -543,7 +652,7 @@ sub quickrows {
 sub disconnect {
     my $self = shift;
     if ($self->dbh) {
-        warn 'debug: Disconnecting from DBI' if($DEBUG);
+        warn 'debug: Disconnecting from DBI' if($self->{sqldb_debug});
         $self->dbh->disconnect;
         delete $self->{sqldb_dbh};
     }
@@ -567,7 +676,7 @@ SQL::DB - Perl interface to SQL Databases
 
 =head1 VERSION
 
-0.13. Development release.
+0.14. Development release.
 
 =head1 SYNOPSIS
 
@@ -700,32 +809,54 @@ Create a new B<SQL::DB> object. The optional @names lists the tables
 that this object is to know about. By default all tables defined by
 define_tables() are known.
 
+=head2 set_debug
+
+Set the debugging status (true/false). With debugging turned on debug
+statements are 'warn'ed.
+
+=head2 debug
+
+Get the debug status.
+
+=head2 set_sqldebug
+
+Set the SQL statement debugging status (true/false). With this turned
+on all SQL statements are 'warn'ed.
+
+=head2 sqldebug
+
+Get the SQL debug status.
+
 =head2 connect($dbi, $user, $pass, $attrs)
 
 Connect to a database. The parameters are passed directly to
 L<DBI>->connect. This method also informs the internal table/column
-representations what type of database we are connected to, so they
-can set their database-specific features accordingly.
+representations what type of database we are connected to, so they can
+set their database-specific features accordingly. Returns the dbh.
 
 =head2 connect_cached($dbi, $user, $pass, $attrs)
 
-Connect to a database, potentially reusing an existing connection.
-The parameters are passed directly to L<DBI>->connect_cached. Useful
-when running under persistent environments.
-This method also informs the internal table/column
-representations what type of database we are connected to, so they
-can set their database-specific features accordingly.
+Connect to a database, potentially reusing an existing connection.  The
+parameters are passed directly to L<DBI>->connect_cached. Useful when
+running under persistent environments.  This method also informs the
+internal table/column representations what type of database we are
+connected to, so they can set their database-specific features
+accordingly. Returns the dbh.
 
 =head2 dbh
 
 Returns the L<DBI> database handle we are connected with.
 
+=head2 deploy_sql
+
+Returns a string containing the CREATE TABLE and CREATE INDEX
+statements necessary to build the schema in the database. The statements
+are correctly ordered based on column reference information.
+
 =head2 deploy
 
-Runs the CREATE TABLE and CREATE INDEX statements necessary to
-create the schema in the database. Will warn on any tables that
-already exist. Table creation is automatically ordered based on column
-references.
+Creates the tables and indexes in the database. Will warn on any attempts to
+create tables that already exist.
 
 =head2 query(@query)
 
@@ -871,14 +1002,9 @@ Nearly the same as $db->do($sqlobject->q_insert).
 
 =head1 COMPATABILITY
 
-Version 0.13 changed the return type of the txn() method. Instead of a
+Version 0.14 changed the return type of the txn() method. Instead of a
 2 value list indicating success/failure and error message, a single
 L<Return::Value> object is returned intead.
-
-=head1 DEBUGGING
-
-If $SQL::DB::DEBUG is set to a true value then SQL
-queries and other important actions are 'warn'ed to STDERR
 
 =head1 SEE ALSO
 

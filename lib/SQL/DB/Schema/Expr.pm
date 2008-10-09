@@ -158,12 +158,13 @@ sub expr_binary {
 
     if (isa($e1, __PACKAGE__)) {
         push(@bind, $e1->bind_values);
-        if ( ($op eq 'OR' and $e1->op =~ m/(OR)|(AND)/) or
-             ($op eq 'AND' and $e1->op =~ m/OR/)) {
+        if ($e1->multi
+            or ($op =~ /^OR/ and $e1->op =~ /^(OR)|(AND)/)
+            or ($op =~ /^AND/ and $e1->op =~ /^OR/)) {
             # always return a new expression, because if we set multi
             # on the current object we screw it up when it is used in
             # other queries.
-            $e1 = $e1->new("$e1", $e1->bind_values);
+            $e1 = __PACKAGE__->new("$e1", $e1->bind_values);
             $e1->multi(1);
         }
     }
@@ -174,10 +175,11 @@ sub expr_binary {
 
     if (isa($e2, __PACKAGE__)) {
         push(@bind, $e2->bind_values);
-        if ( ($op eq 'OR' and $e2->op =~ m/(OR)|(AND)/) or
-             ($op eq 'AND' and $e2->op =~ m/OR/)) {
+        if ($e2->multi
+            or ($op =~ /^OR/ and $e2->op =~ /^(OR)|(AND)/)
+            or ($op =~ /^AND/ and $e2->op =~ /^OR/)) {
             # same as above
-            $e2 = $e2->new("$e2", $e2->bind_values);
+            $e2 = __PACKAGE__->new("$e2", $e2->bind_values);
             $e2->multi(1);
         }
     }
@@ -205,6 +207,22 @@ sub expr_and {
 
 sub expr_or {
     return expr_binary($_[0],'OR',$_[1]);
+}
+
+sub and {
+    return expr_binary($_[0],'AND',$_[1]);
+}
+
+sub or {
+    return expr_binary($_[0],'OR',$_[1]);
+}
+
+sub and_not {
+    return expr_binary($_[0],'AND NOT',$_[1]);
+}
+
+sub or_not {
+    return expr_binary($_[0],'OR NOT',$_[1]);
 }
 
 sub expr_lt {
@@ -280,6 +298,11 @@ sub expr_divide {
 }
 
 
+sub like {
+    return expr_binary($_[0],'LIKE',$_[1]);
+}
+
+
 sub expr_not {
     my $e1 = shift;
     my $expr = __PACKAGE__->new('NOT ('.$e1.')', $e1->bind_values);
@@ -297,6 +320,10 @@ sub in {
         if (isa($e, __PACKAGE__)) {
             push(@exprs, $e);
             push(@bind, $e->bind_values);
+        }
+        elsif (ref($e) and ref($e) eq 'ARRAY') {
+            push(@exprs, map {'?'} @$e);
+            push(@bind, @$e);
         }
         else {
             push(@exprs, '?');
@@ -318,6 +345,10 @@ sub not_in {
             push(@exprs, $e);
             push(@bind, $e->bind_values);
         }
+        elsif (ref($e) and ref($e) eq 'ARRAY') {
+            push(@exprs, map {'?'} @$e);
+            push(@bind, @$e);
+        }
         else {
             push(@exprs, '?');
             push(@bind, $e);
@@ -332,6 +363,10 @@ sub between {
     my $expr1 = shift;
     my @bind = $expr1->bind_values;
     my @exprs;
+
+    if (@_ != 2) {
+        croak 'between($a,$b)';
+    }
 
     foreach my $e (@_) {
         if (isa($e, __PACKAGE__)) {
@@ -355,6 +390,10 @@ sub not_between {
     my $expr1 = shift;
     my @bind = $expr1->bind_values;
     my @exprs;
+
+    if (@_ != 2) {
+        croak 'between($a,$b)';
+    }
 
     foreach my $e (@_) {
         if (isa($e, __PACKAGE__)) {
@@ -463,9 +502,15 @@ B<SQL::DB::Schema::Expr> is ...
 
 =head2 expr_and
 
-
-
 =head2 expr_or
+
+=head2 and
+
+=head2 or
+
+=head2 and_not
+
+=head2 or_not
 
 
 
@@ -501,13 +546,13 @@ B<SQL::DB::Schema::Expr> is ...
 =head2 expr_not
 
 
+=head2 like
+
 
 =head2 in
 
 
-
 =head2 not_in
-
 
 
 =head2 between
@@ -517,7 +562,6 @@ B<SQL::DB::Schema::Expr> is ...
 
 
 =head1 FILES
-
 
 
 =head1 SEE ALSO

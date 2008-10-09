@@ -10,7 +10,7 @@ use UNIVERSAL;
 use Exporter;
 
 
-our $VERSION = '0.13';
+our $VERSION = '0.14';
 our $DEBUG;
 
 our @ISA = qw(Exporter);
@@ -22,6 +22,7 @@ our @EXPORT_OK = qw(
     max
     min
     sum
+    LENGTH
     cast
     upper
     lower
@@ -192,6 +193,11 @@ sub max {
 
 sub sum {
     return do_function('SUM', @_);
+}
+
+
+sub LENGTH {
+    return do_function('LENGTH', @_);
 }
 
 
@@ -661,6 +667,10 @@ in {...definition...}. Each table can only be defined once.
 
 
 =head2 sum
+
+
+
+=head2 LENGTH
 
 
 

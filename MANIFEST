@@ -1,9 +1,4 @@
 Changes
-debian/changelog
-debian/compat
-debian/control
-debian/copyright
-debian/rules
 inc/Module/AutoInstall.pm
 inc/Module/Install.pm
 inc/Module/Install/AutoInstall.pm
@@ -31,12 +26,14 @@ MANIFEST
 MANIFEST.SKIP
 META.yml
 README
+t/lib/SQLDBTest.pm
 t/01-column.t
 t/02-table.t
 t/03-schema.t
 t/04-expr.t
 t/06-acol.t
 t/07-query.t
+t/07-subquery.t
 t/08-row.t
 t/09-db.t
 t/10-cursor.t
