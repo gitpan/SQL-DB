@@ -1,4 +1,16 @@
-commit 87b93607437547f175313bffc1fba310cb694713 (master)
+commit a929c2b3c355c2acec0eedd3c45edac4851c08fc (master)
+Author: Mark Lawrence <nomad@null.net>
+Date:   Sat Oct 11 10:02:40 2008 +0200
+
+    CPAN - Uploaded as v0.16.
+
+commit 5b95d8c3655ba5a276de5dc31ebd42e281e5b42c (master~1)
+Author: Mark Lawrence <nomad@null.net>
+Date:   Sat Oct 11 09:59:51 2008 +0200
+
+    t/12.txn.t - Properly skip tests when DBD::SQLite < 1.15
+
+commit 87b93607437547f175313bffc1fba310cb694713 (master~2)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Fri Oct 10 09:50:48 2008 +0200
 
@@ -6,13 +18,13 @@ Date:   Fri Oct 10 09:50:48 2008 +0200
          - Try to stop t/12-txn.t failing everywhere due to bug 30558 in
            DBD::SQLite 1.14.
 
-commit b2e8ecddcb53c11a5de33475a35517668ef43dc1 (master~1)
+commit b2e8ecddcb53c11a5de33475a35517668ef43dc1 (master~3)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Thu Oct 9 17:56:04 2008 +0200
 
     SQL::DB - Fixed undefined string issue in query_as_string()
 
-commit dc32e647e7c00e0cfadc21899cf98f1f44e867fd (master~2)
+commit dc32e647e7c00e0cfadc21899cf98f1f44e867fd (master~4)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Thu Oct 9 17:28:42 2008 +0200
 
@@ -28,56 +40,56 @@ Date:   Thu Oct 9 17:28:42 2008 +0200
     CPAN
         Uploaded as v0.14.
 
-commit 86fef784bddb8adbf20d51b30be514cf98c48960 (master~3)
+commit 86fef784bddb8adbf20d51b30be514cf98c48960 (master~5)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Fri Oct 3 20:12:47 2008 +0200
 
     SQL::DB - txn() now always returns a Return::Value.
 
-commit 59ca4afa4105c80a6a2c57cedc6244b9b5083afc (master~4)
+commit 59ca4afa4105c80a6a2c57cedc6244b9b5083afc (master~6)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Fri Oct 3 19:56:19 2008 +0200
 
     SQL::DB::Schema - Added the LENGTH function.
 
-commit 1a0de3b801473be9e2c39271383c903e30f12362 (master~5)
+commit 1a0de3b801473be9e2c39271383c903e30f12362 (master~7)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Fri Oct 3 19:53:44 2008 +0200
 
     SQL::DB - Added some clucking and confessing to help with errors.
             - Extra debugging statements during deployment order calculation.
 
-commit 651753004fcc39f47f93a77bc81748b65073fc10 (master~6)
+commit 651753004fcc39f47f93a77bc81748b65073fc10 (master~8)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Thu Sep 18 10:32:18 2008 +0200
 
     SQL::DB - check for self->{sqldb_debug} existence before comparing.
 
-commit 7e76b61950b831178ef840c2459d1ba7bf9dd515 (master~7)
+commit 7e76b61950b831178ef840c2459d1ba7bf9dd515 (master~9)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Thu Sep 18 10:30:01 2008 +0200
 
     SQL::DB - only debug bind statements when debug > 1
 
-commit 6203dbb5e7089d3ea8e6f47d718cb690620797e1 (master~8)
+commit 6203dbb5e7089d3ea8e6f47d718cb690620797e1 (master~10)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Thu Sep 18 10:28:25 2008 +0200
 
     SQL::DB::Schema::Table - use confess instead of croak on failures
 
-commit e574577b32acfb5016c6fea61b422106ab310062 (master~9)
+commit e574577b32acfb5016c6fea61b422106ab310062 (master~11)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Wed Sep 17 03:41:08 2008 +0200
 
     SQL::DB - Removed documentation reference to old $DEBUG.
 
-commit fda3e9daa283a7fce9b972cac8c4d86458be5717 (master~10)
+commit fda3e9daa283a7fce9b972cac8c4d86458be5717 (master~12)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Fri Sep 12 17:07:27 2008 +0200
 
     SQL::DB::Schema::Table - hide warning about variable 'used only once'
 
-commit 0980b10cf29572b46a3393c5810309c0be12eff7 (master~11)
+commit 0980b10cf29572b46a3393c5810309c0be12eff7 (master~13)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Fri Sep 5 10:14:13 2008 +0200
 
@@ -85,14 +97,14 @@ Date:   Fri Sep 5 10:14:13 2008 +0200
         Removed the global $SQL::DB::DEBUG variable in favour of
         per-object $self->{sqldb_debug} variables.
 
-commit 024d506ce0a6adf840d068107597245461103987 (master~12)
+commit 024d506ce0a6adf840d068107597245461103987 (master~14)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Tue Jul 1 11:29:05 2008 +0200
 
     SQL::DB
         Rewrote _deploy_order for clarity.
 
-commit c2416914671b30959433b7afd92b8339b8559ba4 (master~13)
+commit c2416914671b30959433b7afd92b8339b8559ba4 (master~15)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Mon Jun 9 10:43:27 2008 +0200
 
@@ -101,14 +113,14 @@ Date:   Mon Jun 9 10:43:27 2008 +0200
         so that multiple calls to deploy() (perhaps with new tables in the
         schema) succeed.
 
-commit 426659eb123226076b270919357e816e7cc59edf (master~14)
+commit 426659eb123226076b270919357e816e7cc59edf (master~16)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Sun Jun 8 14:12:18 2008 +0200
 
     SQL::DB::Schema::Expr
         Added $expr->and() and $expr->or() methods.
 
-commit cd34fb0c3405804ea59ac0aa5f49316b49214897 (master~15)
+commit cd34fb0c3405804ea59ac0aa5f49316b49214897 (master~17)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Wed Jun 4 22:15:07 2008 +0200
 
@@ -118,7 +130,7 @@ Date:   Wed Jun 4 22:15:07 2008 +0200
     
         Check required number of arguments for $expr->(not_)between().
 
-commit e099b75cd393b2470fc74f11195ce6feeaf29684 (master~16)
+commit e099b75cd393b2470fc74f11195ce6feeaf29684 (master~18)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Wed Jun 4 22:07:33 2008 +0200
 
@@ -133,7 +145,7 @@ Date:   Wed Jun 4 22:07:33 2008 +0200
     SQL::DB::ARow
         Table identifiers now start at "1" instead of "0".
 
-commit 6960cbedfce42a471837b0897f7a96fb66f4532c (master~17)
+commit 6960cbedfce42a471837b0897f7a96fb66f4532c (master~19)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Tue May 27 23:40:18 2008 +0200
 
@@ -141,7 +153,7 @@ Date:   Tue May 27 23:40:18 2008 +0200
         New method: like().
         Fixed up brackets generation for multiple binary operators.
 
-commit 78c5f4654f587563e9584d81785cada3c4c92e86 (master~18)
+commit 78c5f4654f587563e9584d81785cada3c4c92e86 (master~20)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Wed Apr 2 20:57:30 2008 +0200
 
@@ -152,7 +164,7 @@ Date:   Wed Apr 2 20:57:30 2008 +0200
         Skip all tests for non-Debian systems with DBD::SQLite <= 1.14 due
         to bug http://rt.cpan.org/Ticket/Display.html?id=30558.
 
-commit 0e0810750985101b76e7be7217b5c0850e21def9 (master~19)
+commit 0e0810750985101b76e7be7217b5c0850e21def9 (master~21)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Tue Apr 1 23:55:51 2008 +0200
 
@@ -178,7 +190,7 @@ Date:   Tue Apr 1 23:55:51 2008 +0200
         for different DBD backends. There is also now a "make testpg" target -
         for local (to me) testing.
 
-commit a2768bc36bb2cd9d04f16e459efed52a4f5c5c62 (master~20)
+commit a2768bc36bb2cd9d04f16e459efed52a4f5c5c62 (master~22)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Fri Mar 28 15:53:40 2008 +0100
 
@@ -195,14 +207,14 @@ Date:   Fri Mar 28 15:53:40 2008 +0100
     CPAN
         Uploaded as v0.13.
 
-commit 144bb351757686fba990de5cee6be65024bb7bc3 (master~21)
+commit 144bb351757686fba990de5cee6be65024bb7bc3 (master~23)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Fri Mar 28 15:12:03 2008 +0100
 
     t/*
         Moved the database population routines from live.t into TestList.pm
 
-commit 08a40dffd0da43ad4a5bc969a4bf55a22381cce3 (master~22)
+commit 08a40dffd0da43ad4a5bc969a4bf55a22381cce3 (master~24)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Tue Mar 25 23:50:19 2008 +0100
 
@@ -227,14 +239,14 @@ Date:   Tue Mar 25 23:50:19 2008 +0100
     CPAN
         Uploaded as v0.12.
 
-commit 918fe71acbe5553379cda9140cf13b133e11136c (master~23)
+commit 918fe71acbe5553379cda9140cf13b133e11136c (master~25)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Tue Mar 25 11:50:48 2008 +0100
 
     SQL::DB
         Reduced fetch1() down to a simple fetch()->next.
 
-commit a7376604a334c9721c42ef1319d3ac82dcd52f3c (master~24)
+commit a7376604a334c9721c42ef1319d3ac82dcd52f3c (master~26)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Fri Mar 21 09:38:46 2008 +0100
 
@@ -248,7 +260,7 @@ Date:   Fri Mar 21 09:38:46 2008 +0100
     CPAN
         Uploaded as v0.11.
 
-commit 62f08702983970abfaa83d2b0ba55483ad31a802 (master~25)
+commit 62f08702983970abfaa83d2b0ba55483ad31a802 (master~27)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Mon Nov 12 19:24:09 2007 +0100
 
@@ -281,13 +293,13 @@ Date:   Mon Nov 12 19:24:09 2007 +0100
         Bugfix: Now properly produce statements in the correct order for all
         operators for which order matters. Eg: - / > >= < <=
 
-commit 38f8cad4482e1f105faddaaac897a444f224f1a7 (master~26)
+commit 38f8cad4482e1f105faddaaac897a444f224f1a7 (master~28)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Mon Nov 12 19:03:05 2007 +0100
 
     New SQL::DB::quickrows() method for dumping object/row values as a table.
 
-commit d6e8f9fef3f9f8eee58e4bfb880dd0dac95ac6b1 (master~27)
+commit d6e8f9fef3f9f8eee58e4bfb880dd0dac95ac6b1 (master~29)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Mon Nov 5 02:23:48 2007 +0100
 
@@ -300,7 +312,7 @@ Date:   Mon Nov 5 02:23:48 2007 +0100
         columns and ARows. So if you fetched a self join then q_update would
         not produce the correct updates.
 
-commit a450055fd2c3cce34f63ff43ff10b2307a0eb5b1 (master~28)
+commit a450055fd2c3cce34f63ff43ff10b2307a0eb5b1 (master~30)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Sun Nov 4 20:26:34 2007 +0100
 
@@ -326,7 +338,7 @@ Date:   Sun Nov 4 20:26:34 2007 +0100
         New _alias() method, which is in support of Query objects being used in
         nested selects. Ie SELECT ... FROM ($query) now sets AS properly.
 
-commit 4171b4f319267bdd75fa246584fafefb8c276351 (master~29)
+commit 4171b4f319267bdd75fa246584fafefb8c276351 (master~31)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Thu Nov 1 13:19:37 2007 +0100
 
@@ -336,7 +348,7 @@ Date:   Thu Nov 1 13:19:37 2007 +0100
     references table A then the tables are undeployable. SQL::DB->deploy() now
     croaks after too many iterations through the deployment order calculation.
 
-commit ea1f8320148a8b64413d220040d73e193463a015 (master~30)
+commit ea1f8320148a8b64413d220040d73e193463a015 (master~32)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Wed Oct 31 21:31:24 2007 +0100
 
@@ -344,7 +356,7 @@ Date:   Wed Oct 31 21:31:24 2007 +0100
     I think is a bug in SQLite. Even when data inserted is bound as SQL_BLOB
     DBD::SQLite still sets utf8 flag when $dbh->{unicode} is set to true.
 
-commit cd9e5ee33e94369786f2eed8840782a331e58112 (master~31)
+commit cd9e5ee33e94369786f2eed8840782a331e58112 (master~33)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Tue Oct 30 15:29:54 2007 +0100
 
@@ -353,7 +365,7 @@ Date:   Tue Oct 30 15:29:54 2007 +0100
         been a bug in the old code (which I couldn't find) but things
         definately work correctly now.
 
-commit a3467da8edd44c5ac18af10fa477d21835ebfc95 (master~32)
+commit a3467da8edd44c5ac18af10fa477d21835ebfc95 (master~34)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Mon Oct 29 12:58:56 2007 +0100
 
@@ -364,7 +376,7 @@ Date:   Mon Oct 29 12:58:56 2007 +0100
     SQL::DB::Query
         Added select_distinct command.
 
-commit 7f4e409b243bbc9d7f031f97bfc62ebdf408aa19 (master~33)
+commit 7f4e409b243bbc9d7f031f97bfc62ebdf408aa19 (master~35)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Thu Oct 18 11:20:24 2007 +0200
 
@@ -380,7 +392,7 @@ Date:   Thu Oct 18 11:20:24 2007 +0200
     CPAN
         Uploaded as v0.10.
 
-commit 0a4d4a41c92b5fe5bfe06aace9642bf1e6a56f0a (master~34)
+commit 0a4d4a41c92b5fe5bfe06aace9642bf1e6a56f0a (master~36)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Tue Oct 16 11:17:51 2007 +0200
 
@@ -388,7 +400,7 @@ Date:   Tue Oct 16 11:17:51 2007 +0200
     creation and deletion. Fixes the bug reported by Andreas König at
     http://rt.cpan.org/Ticket/Display.html?id=30019
 
-commit 1a5494d772da8bb82379d3cc71c4afc384452e4e (master~35)
+commit 1a5494d772da8bb82379d3cc71c4afc384452e4e (master~37)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Mon Oct 15 13:47:59 2007 +0200
 
@@ -411,7 +423,7 @@ Date:   Mon Oct 15 13:47:59 2007 +0200
     CPAN
         Uploaded as version 0.09.
 
-commit 7d8778e984d3588acbc59caed7651bdbdf083509 (master~36)
+commit 7d8778e984d3588acbc59caed7651bdbdf083509 (master~38)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Fri Oct 12 18:53:22 2007 +0200
 
@@ -428,7 +440,7 @@ Date:   Fri Oct 12 18:53:22 2007 +0200
     t/pod-coverage.t
         Trust undocumented methods from parent classes.
 
-commit a120998139a271cb79e35378c739512f26c62fa7 (master~37)
+commit a120998139a271cb79e35378c739512f26c62fa7 (master~39)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Wed Oct 10 19:01:00 2007 +0200
 
@@ -439,7 +451,7 @@ Date:   Wed Oct 10 19:01:00 2007 +0200
         Uploaded as v0.08. Kind of forced due to MySpam dependency on this
         version.
 
-commit 8c44023f11628335ef6bdc32c98fed31ec957b75 (master~38)
+commit 8c44023f11628335ef6bdc32c98fed31ec957b75 (master~40)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Wed Oct 10 17:33:01 2007 +0200
 
@@ -477,7 +489,7 @@ Date:   Wed Oct 10 17:33:01 2007 +0200
         Multifaced definition support for 'type', 'engine', 'default_charset'
         and 'tablespace'.
 
-commit 54c4bab43480306ad7cd9951f4e49e7014853f0e (master~39)
+commit 54c4bab43480306ad7cd9951f4e49e7014853f0e (master~41)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Wed Oct 10 12:53:58 2007 +0200
 
@@ -487,7 +499,7 @@ Date:   Wed Oct 10 12:53:58 2007 +0200
     CPAN
         Uploaded as v0.07.
 
-commit d3755e22be896a8d4ac9bbb988636708c227f5ae (master~40)
+commit d3755e22be896a8d4ac9bbb988636708c227f5ae (master~42)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Wed Oct 10 12:08:44 2007 +0200
 
@@ -499,7 +511,7 @@ Date:   Wed Oct 10 12:08:44 2007 +0200
     t/*
         Test most objects for circular references.
 
-commit f06f0e329930c7a9055acfd60937e035e7893e92 (master~41)
+commit f06f0e329930c7a9055acfd60937e035e7893e92 (master~43)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Wed Oct 10 09:32:38 2007 +0200
 
@@ -518,7 +530,7 @@ Date:   Wed Oct 10 09:32:38 2007 +0200
         values so that referenced tables exists before the referring
         column/table is created..
 
-commit 8b8eae32cf673bcc85525c8411b10fc0a4c3a9a2 (master~42)
+commit 8b8eae32cf673bcc85525c8411b10fc0a4c3a9a2 (master~44)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Mon Oct 8 23:51:08 2007 +0200
 
@@ -528,7 +540,7 @@ Date:   Mon Oct 8 23:51:08 2007 +0200
     column with SQLite and they were the only query types that caused me issues.
     Should it be standard for all query types?
 
-commit 92a496ef78c40cb8cf808869c555f0872a270281 (master~43)
+commit 92a496ef78c40cb8cf808869c555f0872a270281 (master~45)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Mon Oct 8 17:52:50 2007 +0200
 
@@ -548,7 +560,7 @@ Date:   Mon Oct 8 17:52:50 2007 +0200
         Bugfix: sub q_insert() now correctly handles multiple-column primary
         keys.
 
-commit 56d452512d4ca1d5d12f092a783871e950c6f0b1 (master~44)
+commit 56d452512d4ca1d5d12f092a783871e950c6f0b1 (master~46)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Mon Oct 8 13:46:00 2007 +0200
 
@@ -566,7 +578,7 @@ Date:   Mon Oct 8 13:46:00 2007 +0200
     SQL::DB::Object.
         Removed.
 
-commit 0e69c4f7a0c9f954a9a2be9bfe1239693c272ea8 (master~45)
+commit 0e69c4f7a0c9f954a9a2be9bfe1239693c272ea8 (master~47)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Mon Oct 8 12:02:21 2007 +0200
 
@@ -581,14 +593,14 @@ Date:   Mon Oct 8 12:02:21 2007 +0200
     
         Each class now gets a q_insert() method (similar to q_update()).
 
-commit 7ee91556aeef08c37b3db405655183b44f9aeb3c (master~46)
+commit 7ee91556aeef08c37b3db405655183b44f9aeb3c (master~48)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Sun Oct 7 16:17:32 2007 +0200
 
     SQL::DB
         Documentation cleanup.
 
-commit 3cfe21630f03a77ba6bd6c6f1a3c7ca7ad4e63f2 (master~47)
+commit 3cfe21630f03a77ba6bd6c6f1a3c7ca7ad4e63f2 (master~49)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Sun Oct 7 14:19:30 2007 +0200
 
@@ -597,7 +609,7 @@ Date:   Sun Oct 7 14:19:30 2007 +0200
     SQL::DB
         Removed execute(),objects(),fetcho() & fetcho1() methods.
 
-commit 5c3708a19e77ca5cbd7ce918d236cc57d578fb65 (master~48)
+commit 5c3708a19e77ca5cbd7ce918d236cc57d578fb65 (master~50)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Sat Oct 6 12:38:05 2007 +0200
 
@@ -607,7 +619,7 @@ Date:   Sat Oct 6 12:38:05 2007 +0200
     
     Moved all of SQL::DB::Schema::Functions into SQL::DB::Schema.
 
-commit 3356d7dd17c1294638e19c32ced1876d30db1349 (master~49)
+commit 3356d7dd17c1294638e19c32ced1876d30db1349 (master~51)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Fri Oct 5 16:48:25 2007 +0200
 
@@ -616,13 +628,13 @@ Date:   Fri Oct 5 16:48:25 2007 +0200
     
     Added outline documentation to all modules.
 
-commit 8a652f903b734c08d9d1906b467771c914597d40 (master~50)
+commit 8a652f903b734c08d9d1906b467771c914597d40 (master~52)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Thu Oct 4 18:32:15 2007 +0200
 
     Uploaded to CPAN as v0.06
 
-commit 34bcbe5cc9bdc0428b5c637442bfbb9899716e72 (master~51)
+commit 34bcbe5cc9bdc0428b5c637442bfbb9899716e72 (master~53)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Thu Oct 4 17:24:10 2007 +0200
 
@@ -630,27 +642,27 @@ Date:   Thu Oct 4 17:24:10 2007 +0200
         * Deal with broken MySQL table_info filtering
         * seq(): LOCK both 'sqldb' and the alias. Added missing UNLOCK
 
-commit 854055f98cdc556e3947f5ea00386ddb6a7068ee (master~52)
+commit 854055f98cdc556e3947f5ea00386ddb6a7068ee (master~54)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Wed Oct 3 19:05:50 2007 +0200
 
     SQL::DB
         Make update(), insert(), delete() return true if successful.
 
-commit 4f45a93491a59dae8a097148139e7194d6df32fc (master~53)
+commit 4f45a93491a59dae8a097148139e7194d6df32fc (master~55)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Mon Oct 1 17:00:30 2007 +0200
 
     Moved SQL::DB::Intro back to SQL::DB::Tutorial. Still incomplete...
 
-commit 15e27509cf684c3bb911c9de93c417458f94009d (master~54)
+commit 15e27509cf684c3bb911c9de93c417458f94009d (master~56)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Mon Oct 1 16:09:14 2007 +0200
 
     SQL::DB
         LOCK TABLES command for MySQL sequence emulation.
 
-commit 2667ea0ea84ed5d272c382809dabfe958e0dcb1c (master~55)
+commit 2667ea0ea84ed5d272c382809dabfe958e0dcb1c (master~57)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Mon Oct 1 15:44:59 2007 +0200
 
@@ -659,7 +671,7 @@ Date:   Mon Oct 1 15:44:59 2007 +0200
         bind values actually quoted inline. This means you can now cut and
         paste the text into an SQL session in order to see the actual result.
 
-commit 556a0de835016f472e6db3de3cc435bc4beb34e5 (master~56)
+commit 556a0de835016f472e6db3de3cc435bc4beb34e5 (master~58)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Thu Sep 27 19:47:19 2007 +0200
 
@@ -671,7 +683,7 @@ Date:   Thu Sep 27 19:47:19 2007 +0200
     SQL::DB::Query
         Added INTERSECT operator.
 
-commit 09b3ac307a1a2fdc0be6f831f7946b68aa88f88f (master~57)
+commit 09b3ac307a1a2fdc0be6f831f7946b68aa88f88f (master~59)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Wed Sep 19 09:54:29 2007 +0200
 
@@ -721,7 +733,7 @@ Date:   Wed Sep 19 09:54:29 2007 +0200
         Runs the "default" method for a column if it is a CODE ref, when
         creating objects.
 
-commit 26a1fab79ebd6f23e1d563056bfdbf9f8625bfe7 (master~58)
+commit 26a1fab79ebd6f23e1d563056bfdbf9f8625bfe7 (master~60)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Sat Sep 15 11:38:00 2007 +0200
 
@@ -735,7 +747,7 @@ Date:   Sat Sep 15 11:38:00 2007 +0200
     SQL::DB::Query
         Removed 'selecto' option (not very SQL'ish).
 
-commit 888d13f9f4bb1547f35c682ba1003eed2903f53b (master~59)
+commit 888d13f9f4bb1547f35c682ba1003eed2903f53b (master~61)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Fri Sep 14 15:43:59 2007 +0200
 
@@ -766,7 +778,7 @@ Date:   Fri Sep 14 15:43:59 2007 +0200
     t/*
         Various additions and cleanups.
 
-commit 5cc2c48074503df92da8f2eb04e1bfad33dafd61 (master~60)
+commit 5cc2c48074503df92da8f2eb04e1bfad33dafd61 (master~62)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Fri Sep 14 10:04:38 2007 +0200
 
@@ -779,7 +791,7 @@ Date:   Fri Sep 14 10:04:38 2007 +0200
     CPAN
         Uploaded as 0.05.
 
-commit 68422f5b3549d0cb1f0f7387d884641a6e31bf08 (master~61)
+commit 68422f5b3549d0cb1f0f7387d884641a6e31bf08 (master~63)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Fri Sep 14 01:49:17 2007 +0200
 
@@ -800,7 +812,7 @@ Date:   Fri Sep 14 01:49:17 2007 +0200
     Tests
         A few more added to the mix.
 
-commit 06b5561cef4479dff30ddb676620bfd4d5853437 (master~62)
+commit 06b5561cef4479dff30ddb676620bfd4d5853437 (master~64)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Wed Sep 12 21:23:17 2007 +0200
 
@@ -819,7 +831,7 @@ Date:   Wed Sep 12 21:23:17 2007 +0200
         Now exports on request the Functions subroutines.
         Added example function use to the SYNOPSIS.
 
-commit 3256dd399dffe0481f71d500f980e69e3677c7db (master~63)
+commit 3256dd399dffe0481f71d500f980e69e3677c7db (master~65)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Wed Sep 12 18:22:16 2007 +0200
 
@@ -827,19 +839,19 @@ Date:   Wed Sep 12 18:22:16 2007 +0200
         Complete cleanup and factoring of code, with tests. Looks like this
         class now does what it should.
 
-commit ea8813c18ccfc8fba1f696bd7bfd6a86632f5f20 (master~64)
+commit ea8813c18ccfc8fba1f696bd7bfd6a86632f5f20 (master~66)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Tue Sep 11 22:44:38 2007 +0200
 
     SQL::DB::Functions and t/functions.t added.
 
-commit 1cdb044cb1e13e4d678c3fe94e04232de42523c4 (master~65)
+commit 1cdb044cb1e13e4d678c3fe94e04232de42523c4 (master~67)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Mon Sep 10 10:17:38 2007 +0200
 
     SQL::DB::Table: simplified 'setup_columns' to use 'setup_column'
 
-commit 295650d9f006a81f2fd74ba4ada7d0267e2a4af9 (master~66)
+commit 295650d9f006a81f2fd74ba4ada7d0267e2a4af9 (master~68)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Sun Sep 9 21:50:46 2007 +0200
 
@@ -847,7 +859,7 @@ Date:   Sun Sep 9 21:50:46 2007 +0200
     * All internal hash keys now prefixed by 'sqldb_'.
     * New SQL::DB::Functions package. First function 'coalesce' created.
 
-commit 912f076f80903d94edc60d2e430dd918549a0c89 (master~67)
+commit 912f076f80903d94edc60d2e430dd918549a0c89 (master~69)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Sat Sep 8 21:04:57 2007 +0200
 
@@ -858,109 +870,109 @@ Date:   Sat Sep 8 21:04:57 2007 +0200
     New sql_create(), sql_create_table() and sql_create_indexes() methods for
     SQL::DB::Table. t/02-table.t updated to test for these.
 
-commit 40b94121a45e3a5bac08bab01bf9d4be2bb8a4f4 (master~68)
+commit 40b94121a45e3a5bac08bab01bf9d4be2bb8a4f4 (master~70)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Sat Sep 8 19:58:07 2007 +0200
 
     Added a fetch1() method to return a single value.
 
-commit 96859c4215b51866166cd4433f3373807de533da (master~69)
+commit 96859c4215b51866166cd4433f3373807de533da (master~71)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Sat Sep 8 19:44:54 2007 +0200
 
     Fixed a Query bug where not all table aliases were removed in non-SELECT
     statements.
 
-commit a8ec7eb4dec4168e3f817d98c874fe995c450fa9 (master~70)
+commit a8ec7eb4dec4168e3f817d98c874fe995c450fa9 (master~72)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Thu Sep 6 16:44:04 2007 +0200
 
     Added MySQL table ENGINE|TYPE.
     Added unique_index as a shortcut for index => [unique => 1, ...]
 
-commit 4a5cde2bef168ddc6ed18d62c84807cbccea41d1 (master~71)
+commit 4a5cde2bef168ddc6ed18d62c84807cbccea41d1 (master~73)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Thu Sep 6 14:38:16 2007 +0200
 
     Removed requirement for Perl 5.8. Not sure why it was set in the first
     place - maybe to do with Scalar::Util::weaken support?
 
-commit e59dac4fd11d854760b4556f238ef548dd639937 (master~72)
+commit e59dac4fd11d854760b4556f238ef548dd639937 (master~74)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Wed Sep 5 14:43:21 2007 +0200
 
     VERSION to 0.05
 
-commit c2ed27063c0348ba3750221a3a1f5423ed09590a (master~73)
+commit c2ed27063c0348ba3750221a3a1f5423ed09590a (master~75)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Wed Sep 5 13:50:54 2007 +0200
 
     Debian control description and changes update.
     Released to CPAN as version 0.04.
 
-commit 011f261861eae7d691705f407aed9def3159e02c (master~74)
+commit 011f261861eae7d691705f407aed9def3159e02c (master~76)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Wed Sep 5 13:42:51 2007 +0200
 
     README updates.
 
-commit b2b8c4b54ac10be771adb3c3326925bdf641e01a (master~75)
+commit b2b8c4b54ac10be771adb3c3326925bdf641e01a (master~77)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Wed Sep 5 13:37:44 2007 +0200
 
     Added a test to extract and run the SYNOPSIS code.
 
-commit d0a72e93800d22b937e91a452375bec782ea3667 (master~76)
+commit d0a72e93800d22b937e91a452375bec782ea3667 (master~78)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Wed Sep 5 13:18:58 2007 +0200
 
     The SYNOPSIS from SQL::DB is now a fully working example.
 
-commit bdf5b8ddb467544bdf94e2eae653aafc4e83aaca (master~77)
+commit bdf5b8ddb467544bdf94e2eae653aafc4e83aaca (master~79)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Wed Sep 5 13:18:19 2007 +0200
 
     Fixed "index" to allow just the column name as well as an ARRAY ref.
 
-commit d0a6f5870ff8b5e751ff9555b9a4c8ccc7a651d1 (master~78)
+commit d0a6f5870ff8b5e751ff9555b9a4c8ccc7a651d1 (master~80)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Wed Sep 5 13:17:18 2007 +0200
 
     Make new() and alias for _new() in SQL::DB::ARow. Not yet decided what
     the final api should be.
 
-commit 379073cc98768bd2fc38df76b6d077099a7791cf (master~79)
+commit 379073cc98768bd2fc38df76b6d077099a7791cf (master~81)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Wed Sep 5 13:16:26 2007 +0200
 
     Fixed ASC and DESC to be returned as SQL::DB::Expr objects.
 
-commit 51e6cc803244b946695c9c13c5995eb7a474726a (master~80)
+commit 51e6cc803244b946695c9c13c5995eb7a474726a (master~82)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Wed Sep 5 13:13:49 2007 +0200
 
     Added "ref" as an alias for "references" when defining columns.
 
-commit a473e84314dceffc5c066e0960f97609ad522113 (master~81)
+commit a473e84314dceffc5c066e0960f97609ad522113 (master~83)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Wed Sep 5 11:12:55 2007 +0200
 
     Added "column" definition support (singular version of "columns") to
     the SQL::DB::Table creation syntax.
 
-commit 180cc3d582ea98caf43ea82aa7cd9f64bb4cdc00 (master~82)
+commit 180cc3d582ea98caf43ea82aa7cd9f64bb4cdc00 (master~84)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Wed Sep 5 10:49:59 2007 +0200
 
     t/live updated to test recent changes.
 
-commit 9490c507a90a37f1a580d71e63c02625b245c6d1 (master~83)
+commit 9490c507a90a37f1a580d71e63c02625b245c6d1 (master~85)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Wed Sep 5 10:49:04 2007 +0200
 
     Added the start of a SQL::DB::Tutorial.
 
-commit a05fac56794211c87e845dd9332e60ad3b04845d (master~84)
+commit a05fac56794211c87e845dd9332e60ad3b04845d (master~86)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Wed Sep 5 10:48:34 2007 +0200
 
@@ -970,31 +982,31 @@ Date:   Wed Sep 5 10:48:34 2007 +0200
     we can write "set => [$arow->acolumn = $val]" instead, which is much
     more SQL-like.
 
-commit 483dcdb6322a38cbcc1bf34f9c5cac154314d026 (master~85)
+commit 483dcdb6322a38cbcc1bf34f9c5cac154314d026 (master~87)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Wed Sep 5 10:39:06 2007 +0200
 
     SQL::DB::Expr: New Expressions: <=, >=, +
 
-commit 7a2308396da2a587eb7683d8185dedfdbb95f492 (master~86)
+commit 7a2308396da2a587eb7683d8185dedfdbb95f492 (master~88)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Wed Sep 5 10:36:39 2007 +0200
 
     Minor documentation edits to SQL::DB::Schema.
 
-commit f08e45dda5356e4afa8352ed1cc4edbb50c91e3a (master~87)
+commit f08e45dda5356e4afa8352ed1cc4edbb50c91e3a (master~89)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Wed Sep 5 10:35:27 2007 +0200
 
     SQL::DB::Object: Fixes to "columns changed?" related methods.
 
-commit 8ab138d050aa899b369fa837fc0a17426378d79a (master~88)
+commit 8ab138d050aa899b369fa837fc0a17426378d79a (master~90)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Wed Sep 5 10:33:22 2007 +0200
 
     Added SQL::DB::Query->wantobjects, ->arows, "selecto" methods.
 
-commit 96ab59b7dce96fd0fca7bfab8273d03fcee22fe3 (master~89)
+commit 96ab59b7dce96fd0fca7bfab8273d03fcee22fe3 (master~91)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Wed Sep 5 10:28:53 2007 +0200
 
@@ -1005,81 +1017,81 @@ Date:   Wed Sep 5 10:28:53 2007 +0200
      * Removed Tutorial - will go into new SQL::DB::Tutorial.pod
      * Documentation matches code.
 
-commit 7258a65796db7c15ff566f4fd367e17540ecb8ef (master~90)
+commit 7258a65796db7c15ff566f4fd367e17540ecb8ef (master~92)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Wed Aug 22 19:02:04 2007 +0200
 
     Added method SQL::DB::Table->primary_column_names()
 
-commit f60a61b53ff54dd1f118d1944fd14df429a24ca1 (master~91)
+commit f60a61b53ff54dd1f118d1944fd14df429a24ca1 (master~93)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Tue Aug 21 17:03:55 2007 +0200
 
     Added 'bases' (inherit from class) support to SQL::DB::Table
 
-commit 12db827f6ea8843c8bb6dacdcc52401c3c3d3eb3 (master~92)
+commit 12db827f6ea8843c8bb6dacdcc52401c3c3d3eb3 (master~94)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Tue Aug 21 11:36:29 2007 +0200
 
     Tests & Cleanups
 
-commit d4179cd7ff8e466e8defcd8719861b300e28c9fc (master~93)
+commit d4179cd7ff8e466e8defcd8719861b300e28c9fc (master~95)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Mon Aug 20 23:41:54 2007 +0200
 
     Removed old t/02-abstract.t
 
-commit 2dfe862c919b7bdb0d95afae3427cebabe3ee176 (master~94)
+commit 2dfe862c919b7bdb0d95afae3427cebabe3ee176 (master~96)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Mon Aug 20 23:00:45 2007 +0200
 
     New Schema for tests.
 
-commit 47ce13fc4969ec12ad5728509040ebfc3c870188 (master~95)
+commit 47ce13fc4969ec12ad5728509040ebfc3c870188 (master~97)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Mon Aug 20 22:59:20 2007 +0200
 
     Removed old t/Column.t
 
-commit ebc942ba1bddee2810ab3823051038aed8ab655c (master~96)
+commit ebc942ba1bddee2810ab3823051038aed8ab655c (master~98)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Mon Aug 20 22:55:00 2007 +0200
 
     Added test for SQL::DB::Table
 
-commit 9774e98a7f15546f8392ec6eb2f0799a27beaf5d (master~97)
+commit 9774e98a7f15546f8392ec6eb2f0799a27beaf5d (master~99)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Mon Aug 20 22:33:47 2007 +0200
 
     Added test for SQL::DB::Column
 
-commit f1ba432caee86da98aafe9cecf626b09d8a667d6 (master~98)
+commit f1ba432caee86da98aafe9cecf626b09d8a667d6 (master~100)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Sun Aug 19 23:37:03 2007 +0200
 
     Big simplification and cleanup of SQL::DB::AColumn. SQL::DB::AColumn::Func
     has been removed as the func() method now clones and returns a new AColumn.
 
-commit 548d34cd429a35ed6a9f87ac5cfd8a96897f9752 (master~99)
+commit 548d34cd429a35ed6a9f87ac5cfd8a96897f9752 (master~101)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Sun Aug 19 23:35:25 2007 +0200
 
     Added q_delete to SQL::DB::Object.
 
-commit b35ed20f6514909de86a8d1067fe92ae798f9dbb (master~100)
+commit b35ed20f6514909de86a8d1067fe92ae798f9dbb (master~102)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Sun Aug 19 23:34:51 2007 +0200
 
     Minor cleanups to SQL::DB::Query
 
-commit 0c185ee934a41f166c133417f0bb35b8a0842037 (master~101)
+commit 0c185ee934a41f166c133417f0bb35b8a0842037 (master~103)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Sun Aug 19 11:09:15 2007 +0200
 
     Can no longer call SQL::DB::Schema->arow. User code must now call
     Class->arow, or Class::Abstract->new directly.
 
-commit cf84b62b77e4033bacdf0886fb5bdc67f13ccbf8 (master~102)
+commit cf84b62b77e4033bacdf0886fb5bdc67f13ccbf8 (master~104)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Sun Aug 19 11:07:32 2007 +0200
 
@@ -1087,32 +1099,32 @@ Date:   Sun Aug 19 11:07:32 2007 +0200
     this is now handled by SQL::DB::Table.
     Also includes a simplification - Removed all 'reference' code.
 
-commit 8c254779201404d12e9f44afce6d419628db3f7a (master~103)
+commit 8c254779201404d12e9f44afce6d419628db3f7a (master~105)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Sun Aug 19 11:06:07 2007 +0200
 
     SQL::DB::Table now automatically creates the Class, and the Abstract Class
     for each table.
 
-commit d24d6cc202ca4e911ce7532f732c3e5a97f0fd18 (master~104)
+commit d24d6cc202ca4e911ce7532f732c3e5a97f0fd18 (master~106)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Sun Aug 19 11:03:58 2007 +0200
 
     Cleanup and simplification of functions in SQL::DB::Column.
 
-commit d70c4bff4d80dc269c59cb0b1faa39099bfb9dfc (master~105)
+commit d70c4bff4d80dc269c59cb0b1faa39099bfb9dfc (master~107)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Sun Aug 19 11:01:43 2007 +0200
 
     Removed inc/Module/Install from git/cogito control.
 
-commit df8970faa8b913035c3353f2f28164c5f776b687 (master~106)
+commit df8970faa8b913035c3353f2f28164c5f776b687 (master~108)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Sat Aug 18 20:32:52 2007 +0200
 
     Cleanup and Documentation for SQL::DB::Table
 
-commit cb014d11455950c14c391b449546386ee04b307a (master~107)
+commit cb014d11455950c14c391b449546386ee04b307a (master~109)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Sat Aug 18 17:51:52 2007 +0200
 
@@ -1120,58 +1132,58 @@ Date:   Sat Aug 18 17:51:52 2007 +0200
     means we don't care about the order in which tables are defined, although
     it is still important because the database (eg PostgreSQL) still cares.
 
-commit fba17d2a2364e49f874e3e233d3a523940b40c65 (master~108)
+commit fba17d2a2364e49f874e3e233d3a523940b40c65 (master~110)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Sat Aug 18 17:46:40 2007 +0200
 
     Less verbose debugging in SQL::DB::ARow
 
-commit 29973dbca9bfda6232de6d36b75e798f0bc06138 (master~109)
+commit 29973dbca9bfda6232de6d36b75e798f0bc06138 (master~111)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Sat Aug 18 17:37:41 2007 +0200
 
     Added basic AS support to SQL::DB::AColumn
 
-commit f99f286dc7554b2d132042300b34ccd4964c4eff (master~110)
+commit f99f286dc7554b2d132042300b34ccd4964c4eff (master~112)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Sat Aug 18 17:08:54 2007 +0200
 
     SQL::DB::Schema now has only query() method. select(), update() etc are
     gone.
 
-commit ddc54037393f5ada7beeffc2e60f3d13bf4c815e (master~111)
+commit ddc54037393f5ada7beeffc2e60f3d13bf4c815e (master~113)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Sat Aug 18 17:08:02 2007 +0200
 
     Added not equals '!=' expression type to SQL::DB::Expr.
 
-commit de5034cbb93d4e6591aed5fadd79f58a9ddfaebb (master~112)
+commit de5034cbb93d4e6591aed5fadd79f58a9ddfaebb (master~114)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Sat Aug 18 17:01:05 2007 +0200
 
     Folded SQL::DB::Query::* into SQL::DB::Query. SQL::DB has basic support for
     retrieving on-demand objects and SQL::DB::Object-based objects.
 
-commit f4685ed0b44928b1ff6fbb8e88720e00981a6bc2 (master~113)
+commit f4685ed0b44928b1ff6fbb8e88720e00981a6bc2 (master~115)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Sat Aug 18 16:50:29 2007 +0200
 
     SQL::DB::Table now creates object classes based on SQL::DB::Object.
 
-commit 4a79e6c2ffeb6f8e6f07bdfebdb60dab77df3ed3 (master~114)
+commit 4a79e6c2ffeb6f8e6f07bdfebdb60dab77df3ed3 (master~116)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Sat Aug 18 16:49:27 2007 +0200
 
     Added new SQL::DB::Object class.
 
-commit f6e3b2f5136537d232e86d13b4b4fd8e3a803e47 (master~115)
+commit f6e3b2f5136537d232e86d13b4b4fd8e3a803e47 (master~117)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Tue Jun 26 15:10:07 2007 +0200
 
     * Added Fans (of which an Artist has many) Link-table to the test schema
     * Added hard dependency on DBI
 
-commit 40e77ac1ec09887be04509ad2ebef45c7f0d81b5 (master~116)
+commit 40e77ac1ec09887be04509ad2ebef45c7f0d81b5 (master~118)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Fri Jun 22 01:59:29 2007 +0200
 
@@ -1179,27 +1191,27 @@ Date:   Fri Jun 22 01:59:29 2007 +0200
     the same column.
     * Removed one "weaken" too many in ARow.pm.
 
-commit 25bc634ba5847284998f1cd9cc6cfa97017dc62a (master~117)
+commit 25bc634ba5847284998f1cd9cc6cfa97017dc62a (master~119)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Thu Jun 21 10:58:17 2007 +0200
 
     Added GROUP BY support.
 
-commit 38c5a95ca67ccd5179425a8f6d820359df3525a1 (master~118)
+commit 38c5a95ca67ccd5179425a8f6d820359df3525a1 (master~120)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Wed Jun 20 14:47:53 2007 +0200
 
     Converted SQL::DB::sth_to_simple_objects from Class::Struct =>
     Class::Accessor::Fast. Removed dependency on Class::Struct.
 
-commit ba606fbbb6acf8db66ba47f2b2ed48e5f482ffc4 (master~119)
+commit ba606fbbb6acf8db66ba47f2b2ed48e5f482ffc4 (master~121)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Wed Jun 20 13:59:17 2007 +0200
 
     Converted SQL::DB::Column from Class::Struct to Class::Accessor::Fast
     New dependency on Class::Accessor
 
-commit 593ba883145ce1cf4bd429041b9679f14f43c0e6 (master~120)
+commit 593ba883145ce1cf4bd429041b9679f14f43c0e6 (master~122)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Wed Jun 20 13:16:41 2007 +0200
 
@@ -1208,94 +1220,94 @@ Date:   Wed Jun 20 13:16:41 2007 +0200
     some of the array refs.
     * Fixed a PRIMARY KEY bug in CREATE TABLE statements.
 
-commit 77651e8b419f067feabdc4692ed056b184e70f29 (master~121)
+commit 77651e8b419f067feabdc4692ed056b184e70f29 (master~123)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Wed Jun 20 13:13:32 2007 +0200
 
     Test Schema: Moved table unique and index command to be multiple ARRAYREFs
 
-commit 61c1a014cdc150e0dfc61ca8542199704d3d645f (master~122)
+commit 61c1a014cdc150e0dfc61ca8542199704d3d645f (master~124)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Wed Jun 20 00:25:19 2007 +0200
 
     Added brackets to UNION statements
 
-commit 799bf0fbd52d92b4efbd2f9e80d23c0c2af504a5 (master~123)
+commit 799bf0fbd52d92b4efbd2f9e80d23c0c2af504a5 (master~125)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Tue Jun 19 23:33:26 2007 +0200
 
     Support for arbitrary database functions (count, max, min, etc)
 
-commit 7638cfb9b0e9f1d26925bcfe74538233aa72ab31 (master~124)
+commit 7638cfb9b0e9f1d26925bcfe74538233aa72ab31 (master~126)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Tue Jun 19 21:26:39 2007 +0200
 
     Fixed a rather broken SQL::DB->schema method.
 
-commit d723d3798029834d6642ab9b98d36beff3f784c0 (master~125)
+commit d723d3798029834d6642ab9b98d36beff3f784c0 (master~127)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Tue Jun 19 20:48:09 2007 +0200
 
     Module::Install::Build no longer necessary and removed.
 
-commit 7fb60ce1932cdf7cd0fa1cacc16460dc74e3cf3a (master~126)
+commit 7fb60ce1932cdf7cd0fa1cacc16460dc74e3cf3a (master~128)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Tue Jun 19 20:22:24 2007 +0200
 
     SELECT UNION Support.
 
-commit 60cff74c7679104eb4ed73967c71a85e372cd05f (master~127)
+commit 60cff74c7679104eb4ed73967c71a85e372cd05f (master~129)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Tue Jun 19 19:04:33 2007 +0200
 
     Added vim defaults to every module: # vim: set tabstop=4 expandtab:
 
-commit a6f49bf880862def54c6b3ef0faf96af7299663a (master~128)
+commit a6f49bf880862def54c6b3ef0faf96af7299663a (master~130)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Tue Jun 19 18:16:18 2007 +0200
 
     Column.pm: Make Class::Struct class definition at compile time.
 
-commit b5161ad74522bb17481f39c827fe744fd94293a0 (master~129)
+commit b5161ad74522bb17481f39c827fe744fd94293a0 (master~131)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Tue Jun 19 18:05:00 2007 +0200
 
     Change references to SQL::Builder => SQL::Abstract since Builder is almost
     invisible - ie not on CPAN.
 
-commit ab78471a6657bbbadf71d6992a132a58da6e46bf (master~130)
+commit ab78471a6657bbbadf71d6992a132a58da6e46bf (master~132)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Tue Jun 19 17:58:15 2007 +0200
 
     * Removed META.yml from git/cogito control
     * Added t/live.t that uses a real database. First working example.
 
-commit 62fd440d223a3e561d74f88cea43810468d7c8d6 (master~131)
+commit 62fd440d223a3e561d74f88cea43810468d7c8d6 (master~133)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Tue Jun 19 17:07:38 2007 +0200
 
     Moved Insert.pm, Select.pm... to Query/Insert.pm, Query/Select.pm.
 
-commit 6ffd03a8805a131a387bcf10c4dc1b8a81367529 (master~132)
+commit 6ffd03a8805a131a387bcf10c4dc1b8a81367529 (master~134)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Tue Jun 19 16:44:22 2007 +0200
 
     * Removed 'Changes' file from cogito/git control.
     * INSERT, SELECT, UPDATE, DELETE all do something!
 
-commit c760740570c2f8a5ceb4b1d602228512061df917 (master~133)
+commit c760740570c2f8a5ceb4b1d602228512061df917 (master~135)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Mon Jun 18 16:38:18 2007 +0200
 
     VERSION to 0.02
 
-commit 0643a835dc2413e843a041019e41199a4dff04a0 (master~134)
+commit 0643a835dc2413e843a041019e41199a4dff04a0 (master~136)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Mon Jun 18 16:34:48 2007 +0200
 
     New class SQL::DB to glue SQL::DB::Schema with DBI. Fully documented.
 
-commit 85567556ec241b35b60903eb6670e6f716f596bc (master~135)
+commit 85567556ec241b35b60903eb6670e6f716f596bc (master~137)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Mon Jun 18 16:31:13 2007 +0200
 
@@ -1308,14 +1320,14 @@ Date:   Mon Jun 18 16:31:13 2007 +0200
     * Schema.pm: row() has become arow() 'any', 'abstact', 'a' row.
     * Schema.pm: query() replaced by select(), insert(), delete(), update()
 
-commit 3832282a9e4c32bba39215e612127321890d9f3c (master~136)
+commit 3832282a9e4c32bba39215e612127321890d9f3c (master~138)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Fri Jun 15 18:50:24 2007 +0200
 
     * SQL::API::* renamed to SQL::DB::*
     * SQL::API.pm renamed to SQL::DB::Schema.pm
 
-commit c2f52970463af8d00abed84602cf25941a07b7c0 (master~137)
+commit c2f52970463af8d00abed84602cf25941a07b7c0 (master~139)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Fri Jun 15 18:29:43 2007 +0200
 
@@ -1325,14 +1337,14 @@ Date:   Fri Jun 15 18:29:43 2007 +0200
     * SELECT .... LIMIT
     * Stringifcation for pretty printing/debugging.
 
-commit 9b6517b3eb74d356cc3b061c8a7dc4c020b7bc86 (master~138)
+commit 9b6517b3eb74d356cc3b061c8a7dc4c020b7bc86 (master~140)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Sat Jun 9 23:50:08 2007 +0200
 
     Now have automatic joins (matching up reference keys with primary columns)
     INSERT and SELECT probably good for 90% of queries.
 
-commit 667303900595982625b062f3af20bbbac1804da7 (master~139)
+commit 667303900595982625b062f3af20bbbac1804da7 (master~141)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Fri Jun 8 01:51:04 2007 +0200
 
@@ -1340,7 +1352,7 @@ Date:   Fri Jun 8 01:51:04 2007 +0200
     Testing of the SQL::API interface almost complete. No tests yet
     for any of the subclasses.
 
-commit 1ccf41060a623a7c8c1652f4c0c740b337d56abc (master~140)
+commit 1ccf41060a623a7c8c1652f4c0c740b337d56abc (master~142)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Thu Jun 7 15:51:17 2007 +0200
 
@@ -1348,27 +1360,27 @@ Date:   Thu Jun 7 15:51:17 2007 +0200
     INSERT and SELECT working.
     WHERE statements automatically produce correct FROM table aliases.
 
-commit 523be54f484c31a53de1e0bdf36e158db2343bcc (master~141)
+commit 523be54f484c31a53de1e0bdf36e158db2343bcc (master~143)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Sat Jun 2 23:19:28 2007 +0200
 
     Table and Column classes now handle UNIQUE and FOREIGN KEY statements.
 
-commit 179815c9e7013668d99bd075b186db86cb65ddeb (master~142)
+commit 179815c9e7013668d99bd075b186db86cb65ddeb (master~144)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Sat Jun 2 18:04:18 2007 +0200
 
     Table and Column classes can produce CREATE TABLE statements.
     SELECT statements are broken due to new Table/Column classes.
 
-commit 6dddb63569b272f4dc79f490c09af7d6b0eb31fc (master~143)
+commit 6dddb63569b272f4dc79f490c09af7d6b0eb31fc (master~145)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Fri Jun 1 22:29:13 2007 +0200
 
     Support for SELECT statements (incomplete)
     First test program (test.pl)
 
-commit 7e447fb263acc1c747acb36c0e7a1f37f3f68cb0 (master~144)
+commit 7e447fb263acc1c747acb36c0e7a1f37f3f68cb0 (master~146)
 Author: Mark Lawrence <nomad@null.net>
 Date:   Fri Jun 1 15:38:46 2007 +0200
 
