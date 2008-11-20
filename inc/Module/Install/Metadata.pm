@@ -178,6 +178,7 @@ sub perl_version {
 	$version =~ s/_.+$//;
 	$version = $version + 0; # Numify
 	unless ( $version >= 5.005 ) {
+        warn "VERSION $version";
 		die "Module::Install only supports 5.005 or newer (use ExtUtils::MakeMaker)\n";
 	}
 	$self->{values}{perl_version} = $version;

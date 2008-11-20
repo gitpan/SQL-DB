@@ -11,7 +11,7 @@ use SQL::DB::Row;
 use SQL::DB::Cursor;
 
 
-our $VERSION = '0.16';
+our $VERSION = '0.17';
 
 our @EXPORT_OK = @SQL::DB::Schema::EXPORT_OK;
 foreach (@EXPORT_OK) {
@@ -31,11 +31,9 @@ define_tables([
 # Tell each of the tables why type of DBI/Database we are connected to
 sub _set_table_types {
     my $self = shift;
-    (my $type = lc($self->{sqldb_dbi})) =~ s/^dbi:(.*?):.*/$1/;
-    $type || confess 'bad/missing dbi: definition';
 
     foreach my $table ($self->tables) {
-        $table->set_db_type($type);
+        $table->set_db_type($self->{sqldb_dbd});
     }
     return;
 }
@@ -81,27 +79,30 @@ sub sqldebug {
 sub connect {
     my $self = shift;
 
-    my ($dbi,$user,$pass,$attrs) = @_;
+    my ($dsn,$user,$pass,$attrs) = @_;
     $attrs->{PrintError} = 0;
     $attrs->{RaiseError} = 1;
 
-    if (my $dbh = DBI->connect($dbi,$user,$pass,$attrs)) {
+    if (my $dbh = DBI->connect($dsn,$user,$pass,$attrs)) {
         $self->{sqldb_dbh} = $dbh;
     }
     else {
         croak $DBI::errstr;
     }
 
-    $self->{sqldb_dbi}    = $dbi;
+    $self->{sqldb_dsn}    = $dsn;
     $self->{sqldb_user}   = $user;
     $self->{sqldb_pass}   = $pass;
     $self->{sqldb_attrs}  = $attrs;
     $self->{sqldb_qcount} = 0;
     $self->{sqldb_txn}    = 0;
 
+    $dsn =~ /^dbi:(.*):/;
+    $self->{sqldb_dbd} = $1;
+
     $self->_set_table_types();
 
-    warn "debug: connected to $dbi" if($self->{sqldb_debug});
+    warn "debug: connected to $dsn" if($self->{sqldb_debug});
     return $self->{sqldb_dbh};
 }
 
@@ -109,25 +110,35 @@ sub connect {
 sub connect_cached {
     my $self = shift;
 
-    my ($dbi,$user,$pass,$attrs) = @_;
+    my ($dsn,$user,$pass,$attrs) = @_;
 
-    if (my $dbh = DBI->connect_cached($dbi,$user,$pass,$attrs)) {
+    if (my $dbh = DBI->connect_cached($dsn,$user,$pass,$attrs)) {
         $self->{sqldb_dbh} = $dbh;
     }
     else {
         croak $DBI::errstr;
     }
 
-    $self->{sqldb_dbi}    = $dbi;
+    $self->{sqldb_dsn}    = $dsn;
     $self->{sqldb_user}   = $user;
     $self->{sqldb_pass}   = $pass;
     $self->{sqldb_attrs}  = $attrs;
     $self->{sqldb_qcount} = 0;
 
+    $dsn =~ /^dbi:(.*):/;
+    $self->{sqldb_dbd} = $1;
+
     $self->_set_table_types();
 
-    warn "debug: connect_cached to $dbi" if($self->{sqldb_debug});
+    warn "debug: connect_cached to $dsn" if($self->{sqldb_debug});
     return $self->{sqldb_dbh};
+}
+
+
+sub dbd {
+    my $self = shift;
+    return $self->{sqldb_dbd} if($self->{sqldb_dbh});
+    return;
 }
 
 
@@ -149,7 +160,7 @@ sub _deploy_order {
 
     while (@src) {
         if ($count++ > $limit) {
-            die 'Long deployment calculation - reference columns loop?';
+            die 'Deployment calculation limit exceeded: circular foreign keys?';
         }
 
         my @newsrc = ();
@@ -166,7 +177,7 @@ sub _deploy_order {
             }
         
             if ($deployable) {
-                warn "debug: ".$table->name.' => deploy list ' if($self->{sqldb_sqldebug});
+#                warn "debug: ".$table->name.' => deploy list ' if($self->{sqldb_sqldebug});
                 push(@ordered, $table);
                 $deployed->{$table->name} = 1;
             }
@@ -192,15 +203,11 @@ sub deploy_sql {
 }
 
 
-sub deploy {
+sub _create_tables {
     my $self = shift;
-    $self->dbh || croak 'cannot deploy() before connect()';
+    $self->dbh || croak 'cannot _create_tables() before connect()';
 
-    my @tables = $self->_deploy_order;
-
-    if ($self->table('sqldb')) {
-        unshift(@tables, $self->table('sqldb'));
-    }
+    my @tables = @_;
 
     # Faster to do all of this inside a BEGIN/COMMIT block on
     # things like SQLite, and better that we deploy all or nothing
@@ -215,28 +222,94 @@ sub deploy {
             while (my $x = $sth->fetch) {
                 if ($x->[2] eq $table->name) {
                     carp 'Table '. $table->name
-                         .' already exists - not deploying';
+                         .' already exists - not creating';
                     next TABLES;
                 }
             }
 
             foreach my $action ($table->sql_create) {
-                warn "debug: $action" if($self->{sqldb_sqldebug});
                 my $res;
                 eval {$res = $self->dbh->do($action);};
                 if (!$res or $@) {
                     die $self->dbh->errstr . ' query: '. $action;
                 }
+                warn "debug: $action" if($self->{sqldb_sqldebug});
             }
 
         }
     });
+    return $res;
+}
 
-    croak $res unless($res);
 
-    # Do this in a separate transaction because PostgreSQL doesn't believe
-    # the tables exist until the above transaction is committed.
-    $res = $self->txn(sub{
+sub create_table {
+    my $self = shift;
+    my $name = shift;
+    $self->dbh || croak 'cannot create_table() before connect()';
+
+    my $res = $self->_create_tables($self->table($name));
+
+    croak($res) unless($res);
+    return $res;
+}
+
+
+sub _drop_tables {
+    my $self = shift;
+    $self->dbh || croak 'cannot _drop_tables() before connect()';
+
+    my @tables = @_;
+
+    my $res = $self->txn(sub{
+        foreach my $table (@tables) {
+            my $sth = $self->dbh->table_info('', '', $table->name, 'TABLE');
+            if (!$sth) {
+                die $DBI::errstr;
+            }
+
+            my $x = $sth->fetch;
+            if ($x and $x->[2] eq $table->name) {
+                my $action = 'DROP TABLE IF EXISTS '.$table->name.
+                    ($self->{sqldb_dbd} eq 'Pg' ? ' CASCADE' : '');
+
+                my $res;
+                eval {$res = $self->dbh->do($action);};
+                if (!$res or $@) {
+                    die $self->dbh->errstr . ' query: '. $action;
+                }
+                warn 'debug: '.$action if($self->{sqldb_sqldebug});
+            }
+        }
+    });
+
+    return $res;
+}
+
+
+sub drop_table {
+    my $self = shift;
+    my $name = shift;
+
+    my $res = $self->_drop_tables($self->table($name));
+
+    croak($res) unless($res);
+    return $res;
+}
+
+
+sub deploy {
+    my $self = shift;
+    $self->dbh || croak 'cannot deploy() before connect()';
+
+    my @tables = $self->_deploy_order;
+
+    if ($self->table('sqldb')) {
+        unshift(@tables, $self->table('sqldb'));
+    }
+
+    my $res = $self->txn(sub{
+        $self->_create_tables(@tables);
+
         foreach my $table (@tables) {
             $self->create_seq($table->name);
         }
@@ -251,22 +324,11 @@ sub _undeploy {
     my $self = shift;
     $self->dbh || croak 'cannot _undeploy() before connect()';
 
-    (my $type = lc($self->{sqldb_dbi})) =~ s/^dbi:(.*?):.*/$1/;
-    $type || confess 'bad/missing dbi: definition';
+    my @tables = reverse $self->_deploy_order;
+    my $res    = $self->_drop_tables(@tables, $self->table('sqldb'));
 
-    foreach my $table ($self->tables) {
-        my $res;
-        my $action = 'DROP TABLE '.$table->name.
-            ($type eq 'pg' ? ' CASCADE' : '');
-        eval {$res = $self->dbh->do($action);};
-        if (!$res or $@) {
-            my $err = $self->dbh->errstr;
-            if($err !~ /(no such table)|(does not exist)|(Unknown table)/i) {
-                croak $err . ' query: '. $action;
-            }
-        }
-    }
-    return 1;
+    croak $res unless($res);
+    return $res;
 }
 
 
@@ -490,7 +552,7 @@ sub create_seq {
     my $self = shift;
     my $name = shift || croak 'usage: $db->create_seq($name)';
 
-    $self->{sqldb_dbi} || croak 'Must be connected before calling create_seq';
+    $self->{sqldb_dsn} || croak 'Must be connected before calling create_seq';
 
     my $s = SQL::DB::Schema::ARow::sqldb->new;
 
@@ -523,7 +585,7 @@ sub seq {
         croak 'you should want the full array of sequences';
     }
 
-    $self->{sqldb_dbi} || croak 'Must be connected before calling seq';
+    $self->{sqldb_dsn} || croak 'Must be connected before calling seq';
 
     my $sqldb = SQL::DB::Schema::ARow::sqldb->new;
     my $seq;
@@ -531,7 +593,7 @@ sub seq {
 
     eval {
         # Aparent MySQL bug - no locking with FOR UPDATE
-        if ($self->{sqldb_dbi} =~ m/mysql/i) {
+        if ($self->{sqldb_dbd} eq 'mysql') {
             $self->dbh->do('LOCK TABLES sqldb WRITE, sqldb AS '.
                                     $sqldb->_alias .' WRITE');
         }
@@ -540,7 +602,7 @@ sub seq {
             select     => [$sqldb->val],
             from       => $sqldb,
             where      => $sqldb->name == $name,
-            for_update => ($self->{sqldb_dbi} !~ m/sqlite/i),
+            for_update => ($self->{sqldb_dsn} !~ m/sqlite/i),
         );
 
         croak "Can't find sequence '$name'" unless($seq);
@@ -550,7 +612,7 @@ sub seq {
             where   => $sqldb->name == $name,
         );
 
-        if ($self->{sqldb_dbi} =~ m/mysql/i) {
+        if ($self->{sqldb_dbd} eq 'mysql') {
             $self->dbh->do('UNLOCK TABLES');
         }
 
@@ -559,7 +621,7 @@ sub seq {
     if ($@ or !$no_updates) {
         my $tmp = $@;
 
-        if ($self->{sqldb_dbi} =~ m/mysql/i) {
+        if ($self->{sqldb_dbd} eq 'mysql') {
             $self->dbh->do('UNLOCK TABLES');
         }
 
@@ -598,6 +660,10 @@ sub update {
             croak "Not an updatable object: $obj";
         }
         my ($arows, @updates) = $obj->q_update; # reference hand-holding
+        if (!@updates) {
+            carp "No update for object. Missing PRIMARY KEY?";
+            next;
+        }
         foreach (@updates) {
             $self->do(@$_);
         }
@@ -678,7 +744,7 @@ SQL::DB - Perl interface to SQL Databases
 
 =head1 VERSION
 
-0.16. Development release.
+0.17. Development release.
 
 =head1 SYNOPSIS
 
@@ -829,14 +895,14 @@ on all SQL statements are 'warn'ed.
 
 Get the SQL debug status.
 
-=head2 connect($dbi, $user, $pass, $attrs)
+=head2 connect($dsn, $user, $pass, $attrs)
 
 Connect to a database. The parameters are passed directly to
 L<DBI>->connect. This method also informs the internal table/column
 representations what type of database we are connected to, so they can
 set their database-specific features accordingly. Returns the dbh.
 
-=head2 connect_cached($dbi, $user, $pass, $attrs)
+=head2 connect_cached($dsn, $user, $pass, $attrs)
 
 Connect to a database, potentially reusing an existing connection.  The
 parameters are passed directly to L<DBI>->connect_cached. Useful when
@@ -844,6 +910,12 @@ running under persistent environments.  This method also informs the
 internal table/column representations what type of database we are
 connected to, so they can set their database-specific features
 accordingly. Returns the dbh.
+
+=head2 dbd
+
+Returns the L<DBD> driver name ('SQLite', 'mysql', 'Pg' etc) for the
+type of database we are connected to. Returns undef if we are not
+connected.
 
 =head2 dbh
 
@@ -855,10 +927,22 @@ Returns a string containing the CREATE TABLE and CREATE INDEX
 statements necessary to build the schema in the database. The statements
 are correctly ordered based on column reference information.
 
+=head2 create_table($name)
+
+Creates the table and indexes in the database as previously defined by
+define_tables for table $name. Will warn on any attempts to create
+tables that already exist.
+
+=head2 drop_table($name)
+
+Drops the table and indexes in the database as previously defined by
+define_tables for table $name. Will warn on any attempts to create
+tables that already exist.
+
 =head2 deploy
 
-Creates the tables and indexes in the database. Will warn on any attempts to
-create tables that already exist.
+Creates all defined tables and indexes in the database. Will warn on
+any attempts to create tables that already exist.
 
 =head2 query(@query)
 

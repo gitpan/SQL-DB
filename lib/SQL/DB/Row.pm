@@ -105,9 +105,16 @@ sub make_class_from {
                     if (!@_) {
                         croak $def->[1] . ' requires an argument';
                     }
-                    my $pos  = ${$class.'::_index_'.$def->[0]};
+                    my $val = shift;
+                    my $pos = ${$class.'::_index_'.$def->[0]};
                     $self->[STATUS]->[$pos] = 1;
-                    $self->[MODIFIED]->[$pos] = shift;
+
+                    if (my $sub = $def->[2]->set) {
+                        $self->[MODIFIED]->[$pos] = &$sub($self,$val);
+                    }
+                    else {
+                        $self->[MODIFIED]->[$pos] = $val;
+                    }
                     return;
                 };
             }
@@ -148,9 +155,10 @@ sub make_class_from {
 
 
     *{$class.'::new'} = sub {
-        my $proto = shift;
-        my $incoming;
+        my $proto      = shift;
+        my $finalclass = ref($proto) || $proto;
 
+        my $incoming;
         if (ref($_[0]) and ref($_[0]) eq 'HASH') {
             $incoming = shift;
         }
@@ -158,14 +166,22 @@ sub make_class_from {
             $incoming = {@_};
         }
 
+        # create the object now so it can be used with set_ triggers
         my @status = map {ORIGINAL} (1.. scalar @methods);
+        my @original = ();
+        my @modified = ();
+
+        my $self  = [
+            \@original,                # ORIGINAL
+            \@modified,                # MODIFIED
+            \@status,                  # STATUS
+        ];
+    
+        bless($self, $finalclass);
+
 
         # Set the default values
-        my @original = ();
-        my $hash  = {};
-        map {$hash->{$_} = $defaults->{$_}} keys %$defaults;
-
-        while (my ($key,$val) = each %$hash) {
+        while (my ($key,$val) = each %$defaults) {
             my $i = ${$class.'::_index_'.$key};
             if (defined($i)) {
                 if (ref($val) and ref($val) eq 'CODE') {
@@ -174,30 +190,25 @@ sub make_class_from {
                 else {
                     $original[$i] = $val;
                 }
+
+                # and also preset the incoming values. We do this so
+                # that any set_*() triggers that get called below see
+                # all of the values that were passed in.
+                if (exists($incoming->{$key})) {
+                    $original[$i] = $incoming->{$key};
+                }
             }
         }
 
         # Set the incoming values
-        $hash = {};
-        my @modified = ();
-        map {$hash->{$_} = $incoming->{$_}} keys %$incoming;
-
-        while (my ($key,$val) = each %$hash) {
-            my $i = ${$class.'::_index_'.$key};
-            if (defined($i)) {
-                $status[$i] = MODIFIED;
-                $modified[$i] = $val;
+        while (my ($key,$val) = each %$incoming) {
+            # only set keys which actually exist
+            if (defined ${$class.'::_index_'.$key}) {
+                my $set = 'set_'.$key;
+                $self->$set($val);
             }
         }
 
-        my $self  = [
-            \@original,                # ORIGINAL
-            \@modified,                # MODIFIED
-            \@status,                  # STATUS
-        ];
-    
-        my $finalclass = ref($proto) || $proto;
-        bless($self, $finalclass);
         return $self;
     };
 

@@ -30,7 +30,15 @@ sub Artist {
 #            [name => 'name',type => 'VARCHAR(255)',unique => 1],
 #        ],
         column => [name => 'id',  type => 'INTEGER', primary => 1],
-        column => [name => 'name',type => 'VARCHAR(255)',unique => 1],
+        column => [name => 'name',type => 'VARCHAR(255)',unique => 1,
+            set => sub {
+                my $self = shift;
+                my $val  = shift;
+                $self->set_ucname(uc($val));
+                return $val;
+            },
+        ],
+        column => [name => 'ucname',type => 'VARCHAR(255)'],
         unique => 'name',
         index  => [
             columns => 'name',
@@ -47,7 +55,7 @@ sub Btable {
         column => [
             name => 'bincol',
             type => 'BLOB', bind_type => SQL_BLOB,
-            type_pg => 'BYTEA', bind_type_pg => { pg_type => $pg_type },
+            type_Pg => 'BYTEA', bind_type_Pg => { pg_type => $pg_type },
             deflate => sub { return nfreeze($_[0]) },
             inflate => sub { return thaw($_[0]) },
         ],
@@ -65,8 +73,8 @@ sub Default {
         column => [
             name => 'binary',
             type => 'BLOB',
-            type_pg => 'BYTEA',
-            bind_type_pg => 'pg bind type',
+            type_Pg => 'BYTEA',
+            bind_type_Pg => 'Pg bind type',
         ],
     ];
 }
@@ -80,7 +88,11 @@ sub CD {
             [name => 'id', type => 'INTEGER', primary => 1],
             [name => 'title', type => 'VARCHAR(255)'],
             [name => 'year', type => 'INTEGER'],
-            [name => 'artist', type => 'INTEGER', references => 'artists(id)'],
+            [   name => 'artist',
+                type => 'INTEGER',
+                references => 'artists(id)',
+                deferrable => 'initially immediate',
+            ],
         ],
         unique  => 'title,artist',
         index   => [
@@ -129,7 +141,8 @@ sub ArtistFan {
         class => 'ArtistFan',
         columns => [
             [name => 'artist', type => 'INTEGER', references => 'artists(id)'],
-            [name => 'fan', type => 'INTEGER', references => 'fans(id)'],
+            [name => 'fan', type => 'INTEGER', references =>
+            'fans(id)', deferrable => undef],
         ],
         unique => 'artist,fan',
         index  => [

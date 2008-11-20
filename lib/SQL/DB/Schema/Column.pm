@@ -63,13 +63,23 @@ sub type {
 }
 
 
-sub type_pg {
+sub type_Pg {
     my $self = shift;
     if (@_) {
-        $self->{type_pg} = shift;
+        $self->{type_Pg} = shift;
         return;
     }
-    croak 'usage: type_pg($type)';
+    croak 'usage: type_Pg($type)';
+}
+
+
+sub type_mysql {
+    my $self = shift;
+    if (@_) {
+        $self->{type_mysql} = shift;
+        return;
+    }
+    croak 'usage: type_mysql($type)';
 }
 
 
@@ -91,13 +101,23 @@ sub bind_type {
 }
 
 
-sub bind_type_pg {
+sub bind_type_Pg {
     my $self = shift;
     if (@_) {
-        $self->{bind_type_pg} = shift;
+        $self->{bind_type_Pg} = shift;
         return;
     }
-    croak 'usage: bind_type_pg($type)';
+    croak 'usage: bind_type_Pg($type)';
+}
+
+
+sub bind_type_mysql {
+    my $self = shift;
+    if (@_) {
+        $self->{bind_type_mysql} = shift;
+        return;
+    }
+    croak 'usage: bind_type_mysql($type)';
 }
 
 
@@ -130,6 +150,31 @@ sub references {
     weaken($self->{references});
 #   $col->table->has_many($self);
     return $self->{references};
+}
+
+
+sub deferrable {
+    my $self = shift;
+
+    if (@_) {
+        $self->{deferrable} = uc(shift);
+    }
+    return $self->{deferrable} if(exists($self->{deferrable}));
+    return;
+}
+
+
+sub set {
+    my $self = shift;
+
+    if (@_) {
+        my $sub = shift;
+        (CORE::ref($sub) && CORE::ref($sub) eq 'CODE') ||
+            croak 'set requires a CODEREF argument';
+        $self->{set} = $sub;
+    }
+
+    return $self->{set};
 }
 
 
@@ -175,17 +220,30 @@ sub sql_default {
     return " DEFAULT '" . $default ."'";
 }
 
+
 sub sql {
     my $self = shift;
+    my $def = '';
+    if (exists($self->{deferrable})) {
+        if ($self->{deferrable}) {
+            $def = ' DEFERRABLE '.$self->{deferrable};
+        }
+        else {
+            $def = ' NOT DEFERRABLE';
+        }
+    }
+
     return sprintf('%-15s %-15s', $self->name, $self->type)
            . ($self->null ? 'NULL' : 'NOT NULL')
            . $self->sql_default
            . ($self->auto_increment ? ' AUTO_INCREMENT' : '')
            . ($self->unique ? ' UNIQUE' : '')
 #           . ($self->primary ? ' PRIMARY KEY' : '')
-           . ($self->references ? ' REFERENCES '
-               . $self->references->table->name .'('
-               . $self->references->name .')' : '')
+           . ($self->references ? 
+                (' REFERENCES ' . $self->references->table->name .'('
+                 . $self->references->name .')'. $def  
+                ) : ''
+             )
     ;
 }
 
@@ -236,11 +294,13 @@ B<SQL::DB::Schema::Column> is ...
 =head2 primary
 
 =head2 type
-=head2 type_pg
+=head2 type_Pg
+=head2 type_mysql
 
 
 =head2 bind_type
-=head2 bind_type_pg
+=head2 bind_type_Pg
+=head2 bind_type_mysql
 
 
 =head2 ref
@@ -249,6 +309,15 @@ B<SQL::DB::Schema::Column> is ...
 
 =head2 references
 
+=head2 deferrable
+
+
+=head2 set
+
+Takes an object method (subroutine reference) which is run when
+SQL::DB::Row->set_column($val) is called. The subref has access to the
+row object and all of its columns, but must return the value for the
+column and not set it.
 
 
 =head2 inflate

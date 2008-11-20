@@ -1,6 +1,6 @@
 use strict;
 use warnings;
-use Test::More tests => 27;
+use Test::More tests => 29;
 use Test::Memory::Cycle;
 
 BEGIN {
@@ -48,17 +48,18 @@ ok($table->columns, 'columns');
 memory_cycle_ok($table, 'memory ok');
 
 my @cols = $table->columns;
-ok(@cols == 2, '2 columns');
+ok(@cols == 3, '3 columns');
 isa_ok($cols[0], 'SQL::DB::Schema::Column');
 
 my @colnames = $table->column_names;
-ok(@colnames == 2, '2 column names');
+ok(@colnames == 3, '3 column names');
 @colnames = $table->column_names_ordered;
-ok(@colnames == 2, '2 column names');
+ok(@colnames == 3, '3 column names');
 ok($colnames[0] eq 'id', 'First col is id');
 
 isa_ok($table->column('name'), 'SQL::DB::Schema::Column');
 ok($table->column('name')->name eq 'name', 'Column name is name.');
+
 
 like($table->sql_create_table, qr/CREATE TABLE artists/, 'SQL');
 like($table->sql_create_table, qr/PRIMARY KEY/, 'SQL');
@@ -67,6 +68,7 @@ like($table->sql_create_table, qr/UNIQUE/, 'SQL');
 is($table->sql_create_table,'CREATE TABLE artists (
     id              INTEGER        NOT NULL,
     name            VARCHAR(255)   NOT NULL UNIQUE,
+    ucname          VARCHAR(255)   NOT NULL,
     PRIMARY KEY(id),
     UNIQUE (name)
 )', 'create table no database');
@@ -77,6 +79,7 @@ $table->set_db_type('mysql');
 is($table->sql_create_table,'CREATE TABLE artists (
     id              INTEGER        NOT NULL,
     name            VARCHAR(255)   NOT NULL UNIQUE,
+    ucname          VARCHAR(255)   NOT NULL,
     PRIMARY KEY(id),
     UNIQUE (name)
 ) ENGINE=InnoDB', 'create table mysql');
@@ -91,10 +94,21 @@ memory_cycle_ok($table, 'table memory');
 
 $cd->column('artist')->references($table->column('id'));
 
+is($cd->column('artist')->deferrable, 'INITIALLY IMMEDIATE', 'deferrable');
+is($cd->sql_create_table, 'CREATE TABLE cds (
+    id              INTEGER        NOT NULL,
+    title           VARCHAR(255)   NOT NULL,
+    year            INTEGER        NOT NULL,
+    artist          INTEGER        NOT NULL REFERENCES artists(id) DEFERRABLE INITIALLY IMMEDIATE,
+    PRIMARY KEY(id),
+    UNIQUE (title, artist)
+)', 'CD as string');
+
 my $default = SQL::DB::Schema::Table->new(@{TestLib->Default});
 is($default->column('binary')->type, 'BLOB', 'column type');
 is($default->column('binary')->bind_type, undef, 'undef bind_column type');
-$default->set_db_type('pg');
+$default->set_db_type('Pg');
 is($default->column('binary')->type, 'BYTEA', 'pg column type');
-is($default->column('binary')->bind_type, 'pg bind type', 'pg bind_column type');
+is($default->column('binary')->bind_type, 'Pg bind type', 'pg bind_column type');
+
 
