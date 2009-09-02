@@ -9,8 +9,6 @@ build_requires:
   Test::Exception: 0
   Test::Memory::Cycle: 0
   Test::More: 0
-  Test::Pod: 0
-  Test::Pod::Coverage: 0
 distribution_type: module
 generated_by: 'Module::Install version 0.76'
 license: GPL
@@ -29,4 +27,4 @@ requires:
   Return::Value: 0
   Scalar::Util: 0
   perl: 5.6.0
-version: 0.17
+version: 0.18

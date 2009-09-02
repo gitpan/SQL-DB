@@ -94,6 +94,7 @@ sub st_where {
     my $self  = shift;
     my $where = shift;
 
+    return unless(defined $where);
     push(@{$self->{query}}, 'sql_where', $where);
     $self->push_bind_values($where->bind_values);
     return;

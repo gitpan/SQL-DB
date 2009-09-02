@@ -1,7 +1,7 @@
 package SQL::DB::Row;
 use strict;
 use warnings;
-use Carp qw(croak);
+use Carp qw(croak confess);
 use Scalar::Util qw(refaddr);
 
 use constant ORIGINAL => 0;
@@ -163,6 +163,9 @@ sub make_class_from {
             $incoming = shift;
         }
         else {
+            if (@_ % 2) {
+                confess "Uneven number of arguments";
+            }
             $incoming = {@_};
         }
 
@@ -329,7 +332,7 @@ sub make_class_from {
         # is the only holder of a strong reference to the ARows belonging
         # to those AColumns. So if we didn't return the ARow as well then
         # AColumn->_arow is undefined and SQL::DB::Schema::Query barfs.
-        return ($arows, @queries);
+        return ($arows, @queries ? @{$queries[0]} : ());
     };
 
 
@@ -363,7 +366,7 @@ sub make_class_from {
                         }
 
                         $primary->{$groupid} = 1;
-                        if (!$where->{$groupid}) {
+                        if (! defined $where->{$groupid}) {
                             $where->{$groupid} =
                                 ($arows->{$groupid}->$colname ==
                                 $self->[$self->[STATUS]->[$i]]->[$i]);
@@ -406,7 +409,7 @@ sub make_class_from {
                     }
 
                     $primary->{$tname} = 1;
-                    if (!$where->{$tname}) {
+                    if (! defined $where->{$tname}) {
                         $where->{$tname} = ($arows->{$tname}->$colname ==
                             $self->[$self->[STATUS]->[$i]]->[$i]);
                     }
@@ -441,7 +444,7 @@ sub make_class_from {
         # is the only holder of a strong reference to the ARows belonging
         # to those AColumns. So if we didn't return the ARow as well then
         # AColumn->_arow is undefined and SQL::DB::Schema::Query barfs.
-        return ($arows, @queries);
+        return ($arows, @queries ? @{$queries[0]} : ());
     };
 
 
@@ -502,7 +505,7 @@ sub make_class_from {
         # is the only holder of a strong reference to the ARows belonging
         # to those AColumns. So if we didn't return the ARow as well then
         # AColumn->_arow is undefined and SQL::DB::Schema::Query barfs.
-        return ($arows, @queries);
+        return ($arows, @queries ? @{$queries[0]} : ());
     };
 
     *{$class.'::quickdump'} = sub {

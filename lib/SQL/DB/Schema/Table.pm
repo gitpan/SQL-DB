@@ -156,7 +156,7 @@ sub setup_columns {
 sub setup_primary {
     my $self = shift;
     my $def  = shift;
-    push(@{$self->{primary}}, $self->text2cols($def));
+    map {$_->primary(1)} $self->text2cols($def);
 }
 
 
@@ -264,6 +264,14 @@ sub setup_index {
 sub setup_foreign {
     my $self = shift;
     warn 'multi foreign not implemented yet';
+}
+
+
+sub setup_trigger {
+    my $self = shift;
+    my $trigger = shift || confess 'trigger not defined';
+    ref($trigger) eq 'HASH' || confess 'trigger must be HASH ref';
+    push(@{$self->{triggers}}, $trigger);
 }
 
 
@@ -391,6 +399,17 @@ sub primary_column_names {
     my $self = shift;
     return map {$_->name} @{$self->{primary}} if($self->{primary});
     return;
+}
+
+
+sub ref_by {
+    my $self = shift;
+    if (@_) {
+        my $table = shift;
+        $self->{ref_by}->{$table->name} = $table;
+        weaken($self->{ref_by}->{$table->name});
+    }
+    return values %{$self->{ref_by}};
 }
 
 
@@ -536,10 +555,26 @@ sub sql_create_indexes {
     return @sql;
 }
 
+sub sql_triggers {
+    my $self = shift;
+    return () unless($self->{triggers});
+
+    my $type = $self->{db_type} || 'SQLite';
+    my @triggers;
+
+    foreach my $trigger (@{$self->{triggers}}) {
+        next unless(exists $trigger->{$type});
+        push(@triggers, $trigger->{$type});
+    }
+
+    return @triggers;
+}
+
 
 sub sql_create {
     my $self = shift;
-    return ($self->sql_create_table, $self->sql_create_indexes);
+    return ($self->sql_create_table, $self->sql_create_indexes,
+            $self->sql_triggers);
 }
 
 
@@ -651,6 +686,13 @@ $charset specifies the SQL default character set. Applies only to MySQL.
 
 $tspace specifies the PostgreSQL tablespace definition.
 
+=head2 trigger => { $type => $sql, ... }
+
+This is the place to put trigger statements. In fact, any kind of SQL
+that needs to run after table create can be specified here. The hashref
+keys are the DBD type, so you can specify different code for different
+database systems.
+
 =head1 METHODS
 
 =head2 new(@definition)
@@ -689,6 +731,12 @@ as primary.
 
 Returns the list of columns names which have been defined as primary.
 
+=head2 ref_by
+
+Returns the list of L<SQL::DB::Schema::Table> objects which have
+foreign keys pointing to this table. Takes a single optional
+L<SQL::DB::Schema::Table> argument to add to the list.
+
 =head2 schema
 
 Returns the schema (a L<SQL::DB::Schema> object) which this table
@@ -701,6 +749,10 @@ Returns the SQL statement for table creation.
 =head2 sql_index
 
 Returns the list of SQL statements for table index creation.
+
+=head2 sql_triggers
+
+Returns the SQL statements specified by the 'trigger' calls.
 
 =head1 INTERNAL METHODS
 
@@ -796,6 +848,7 @@ B<SQL::DB::Schema::Table> is ...
 
 =head2 setup_foreign
 
+=head2 setup_trigger
 
 
 =head2 setup_default_charset_mysql
