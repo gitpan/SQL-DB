@@ -3,15 +3,18 @@ abstract: 'Perl interface to SQL Databases'
 author:
   - 'Mark Lawrence <nomad@null.net>'
 build_requires:
-  DBD::SQLite: 1.14
+  DBD::SQLite: 1.26_06
+  ExtUtils::MakeMaker: 6.42
   File::Temp: 0
-  PadWalker: 0
+  Test::Database: 0
   Test::Exception: 0
   Test::Memory::Cycle: 0
   Test::More: 0
+configure_requires:
+  ExtUtils::MakeMaker: 6.42
 distribution_type: module
-generated_by: 'Module::Install version 0.76'
-license: GPL
+generated_by: 'Module::Install version 1.00'
+license: gpl
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
   version: 1.4
@@ -20,11 +23,11 @@ no_index:
   directory:
     - inc
     - t
-    - demo
+    - xt
 requires:
-  Class::Accessor::Fast: 0
   DBI: 0
-  Return::Value: 0
-  Scalar::Util: 0
-  perl: 5.6.0
-version: 0.18
+  Moo: 0
+  Try::Tiny: 0.04
+resources:
+  license: http://opensource.org/licenses/gpl-license.php
+version: 0.19_1
