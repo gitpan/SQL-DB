@@ -43,7 +43,7 @@ use overload
   #    'ne'     => '_expr_ne',
   ;
 
-our $VERSION = '0.19_1';
+our $VERSION = '0.19_2';
 
 has '_txt' => (
     is       => 'rw',

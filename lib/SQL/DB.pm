@@ -23,7 +23,7 @@ use Sub::Exporter -setup => {
     },
 };
 
-our $VERSION = '0.19_1';
+our $VERSION = '0.19_2';
 
 # Instance attributes
 
@@ -468,7 +468,7 @@ SQL::DB - Perl interface to SQL Databases
 
 =head1 VERSION
 
-0.18. Development release.
+0.19. Development release.
 
 =head1 SYNOPSIS
 

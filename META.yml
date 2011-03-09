@@ -7,8 +7,7 @@ build_requires:
   ExtUtils::MakeMaker: 6.42
   File::Temp: 0
   Test::Database: 0
-  Test::Exception: 0
-  Test::Memory::Cycle: 0
+  Test::Differences: 0
   Test::More: 0
 configure_requires:
   ExtUtils::MakeMaker: 6.42
@@ -25,9 +24,11 @@ no_index:
     - t
     - xt
 requires:
-  DBI: 0
+  DBIx::Connector: 0
   Moo: 0
+  Sub::Exporter: 0.04
+  Sub::Install: 0.04
   Try::Tiny: 0.04
 resources:
   license: http://opensource.org/licenses/gpl-license.php
-version: 0.19_1
+version: 0.19_2
