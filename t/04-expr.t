@@ -1,6 +1,6 @@
 use strict;
 use warnings;
-use Test::More;
+use Test::More tests => 131;
 use Test::Differences qw/eq_or_diff/;
 use SQL::DB::Expr qw/AND OR _expr_join _bexpr_join /;
 

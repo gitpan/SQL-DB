@@ -5,6 +5,7 @@ author:
 build_requires:
   DBD::SQLite: 1.26_06
   ExtUtils::MakeMaker: 6.42
+  File::Slurp: 0
   File::Temp: 0
   Test::Database: 0
   Test::Differences: 0
@@ -28,7 +29,6 @@ requires:
   Moo: 0
   Sub::Exporter: 0.04
   Sub::Install: 0.04
-  Try::Tiny: 0.04
 resources:
   license: http://opensource.org/licenses/gpl-license.php
-version: 0.19_2
+version: 0.19_3

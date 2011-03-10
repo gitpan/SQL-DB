@@ -2,7 +2,6 @@ package SQL::DB;
 use strict;
 use warnings;
 use Moo;
-use Try::Tiny qw/ catch /;
 use DBIx::Connector;
 use Carp qw/croak carp cluck confess/;
 use SQL::DB::Cursor;
@@ -10,8 +9,6 @@ use SQL::DB::Expr qw/:all/;
 use Sub::Exporter -setup => {
     exports => [
         qw/
-          try
-          catch
           query
           /,
     ],
@@ -23,7 +20,7 @@ use Sub::Exporter -setup => {
     },
 };
 
-our $VERSION = '0.19_2';
+our $VERSION = '0.19_3';
 
 # Instance attributes
 
@@ -195,6 +192,8 @@ sub current_timestamp {
 }
 
 sub txn {
+    my $wantarray = wantarray;
+
     my $self          = shift;
     my $set_timestamp = !$self->_current_timestamp;
 
@@ -202,16 +201,18 @@ sub txn {
         $self->_current_timestamp( $self->current_timestamp );
     }
 
-    $self->conn->txn(@_);
+    my @ret = $self->conn->txn(@_);
 
     if ($set_timestamp) {
         $self->_current_timestamp(undef);
     }
+
+    return $wantarray ? @ret : $ret[0];
 }
 
-sub _do {
+sub do {
     my $self    = shift;
-    my $prepare = shift || croak '_do($prepare)';
+    my $prepare = $self->prepare_mode;
     my $query   = eval { query(@_) };
 
     if ( !defined $query ) {
@@ -251,16 +252,6 @@ sub _do {
               . "\n$_";
         }
     );
-}
-
-sub do {
-    my $self = shift;
-    return $self->_do( 'prepare_cached', @_ );
-}
-
-sub do_nopc {
-    my $self = shift;
-    return $self->_do( 'prepare', @_ );
 }
 
 sub sth {
@@ -320,67 +311,10 @@ sub cursor {
     );
 }
 
-sub _fetch {
-    my $self = shift;
-    my $prepare = shift || croak '_fetch($prepare)';
-
-    my $expr = query(@_);
-
-    my $wantarray = wantarray;
-    local $Carp::Internal{'Try::Tiny'};
-    $Carp::Internal{'Try::Tiny'}++;
-
-    Try::Tiny::try {
-        my $class = 'junk';   #SQL::DB::Row->make_class_from( $expr->acolumns );
-        my $rv;
-
-        my $sth = $self->conn->dbh->$prepare("$expr");
-        my $i   = 1;
-        foreach my $type ( @{ $expr->_btypes } ) {
-
-            $sth->bind_param( $i, undef, $type ) if ( defined $type );
-            $i++;
-        }
-        $rv = $sth->execute( @{ $expr->_bvalues } );
-
-        if ($wantarray) {
-
-         #            carp 'debug: '.
-         #                $self->query_as_string("$expr", @{ $expr->_bvalues });
-            return @{ $sth->fetchall_arrayref() };
-            my $arrayref = $sth->fetchall_hashref();
-            carp '(Rows: '
-              . scalar @$arrayref . ') '
-              . $self->query_as_string( "$expr", @{ $expr->_bvalues } );
-
-            #                if($self->debug);
-
-            return map { $class->new_from_arrayref($_)->_inflate } @{$arrayref};
-        }
-
-        carp '(Cursor call) '
-          . $self->query_as_string( "$expr", @{ $expr->_bvalues } );
-
-        #            if ( $self->debug );
-
-        return SQL::DB::Cursor->new( $sth, $class );
-
-    }
-    catch {
-        croak "$_: Query was:\n"
-          . $self->query_as_string( "$expr", @{ $expr->_bvalues } );
-    };
-}
-
 sub fetch {
     my $self = shift;
     return $self->cursor(@_)->all;
 }
-
-#sub fetch_nopc {
-#    my $self = shift;
-#    return $self->_fetch( 'prepare', @_ );
-#}
 
 sub fetch1 {
     my $self   = shift;
@@ -390,12 +324,6 @@ sub fetch1 {
     $cursor->finish;
     return $first;
 }
-
-#sub fetch1_nopc {
-#    my $self   = shift;
-#    my @results = $self->_fetch( 'prepare', @_ );
-#    return $results[0];
-#}
 
 sub insert {
     my $self = shift;
@@ -441,23 +369,6 @@ sub delete {
     }
     return $self->do(@delete);
 }
-
-sub disconnect {
-    my $self = shift;
-    if ( $self->conn->dbh ) {
-        warn 'Disconnecting from DBI' if ( $self->debug );
-        $self->conn->dbh->disconnect;
-        $self->dbh(undef);
-        $self->dbd('');
-    }
-    return;
-}
-
-#
-# Functions
-#
-
-no Moo;
 
 1;
 __END__
@@ -1042,13 +953,6 @@ values (eg INSERT, UPDATE and DELETE). Returns whatever value the
 underlying L<DBI>->do call returns.  This method uses "prepare_cached"
 to prepare the call to the database.
 
-=item do_nopc(@query)
-
-Same as for do() but uses "prepare" instead of "prepare_cached" to
-prepare the call to the database. This is really only necessary if you
-tend to be making recursive queries that are exactly the same. See
-L<DBI> for details.
-
 =item fetch(@query) -> SQL::DB::Cursor | @SQL::DB::Row
 
 Constructs an L<SQL::DB::Query> object as defined by @query and runs
@@ -1066,26 +970,12 @@ When called in scalar context returns a query cursor
 (L<SQL::DB::Cursor>) (with "next", "all" and "reset" methods) to
 retrieve dynamically constructed objects one at a time.
 
-=item fetch_nopc(@query) -> SQL::DB::Cursor | @SQL::DB::Row
-
-Same as for fetch() but uses "prepare" instead of "prepare_cached" to
-prepare the call to the database. This is really only necessary if you
-tend to be making recursive queries that are exactly the same. See
-L<DBI> for details.
-
 =item fetch1(@query) -> SQL::DB::Row
 
 Similar to fetch() but always returns only the first object from the
 result set. All other rows (if any) can not be retrieved. You should
 only use this method if you know/expect one result. This method uses
 "prepare_cached" to prepare the call to the database.
-
-=item fetch1_nopc(@query) -> SQL::DB::Row
-
-Same as for fetch1() but uses "prepare" instead of "prepare_cached" to
-prepare the call to the database. This is really only necessary if you
-tend to be making recursive queries that are exactly the same. See
-L<DBI> for details.
 
 =item query(@query)
 
@@ -1134,20 +1024,9 @@ Runs the code in &coderef as an SQL transaction. If &coderef does not
 raise any exceptions then the transaction is commited, otherwise it is
 rolled back.
 
-Returns true/false on success/failure.
-
 This method can be called recursively, but any sub-transaction failure
 will always result in the outer-most transaction also being rolled
 back.
-
-=item quickrows(@objs)
-
-Returns a string containing the column values of @objs in a tabular
-format. Useful for having a quick look at what the database has
-returned:
-
-    my @objs = $db->fetch(....);
-    warn $db->quickrows(@objs);
 
 =item create_sequence( @sequence )
 
@@ -1171,13 +1050,15 @@ Reset the sequence counter value.
 
 Drops sequence $name from the database.
 
-=item disconnect
-
-Disconnect from the database. Effectively DBI->disconnect.
-
 =back
 
 =head1 COMPATABILITY
+
+All SQL::DB releases have so far been DEVELOPMENT!
+
+Version 0.19 was a complete rewrite based on Moo. Lots of things were
+simplified, modules deleted, dependencies removed, etc. The API has
+changed completely.
 
 Version 0.13 changed the return type of the txn() method. Instead of a
 2 value list indicating success/failure and error message, a single
@@ -1185,7 +1066,8 @@ L<Return::Value> object is returned intead.
 
 =head1 SEE ALSO
 
-L<SQL::Abstract>, L<DBIx::Class>, L<Class::DBI>, L<Tangram>
+L<DBIx::Connector>, L<SQL::DB::Expr>, L<SQL::DB::Cursor>,
+L<SQL::DB::Schema>
 
 =head1 SUPPORT
 

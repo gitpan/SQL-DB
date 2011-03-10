@@ -50,7 +50,7 @@ use Sub::Exporter -setup => {
     },
 };
 
-our $VERSION = '0.19_2';
+our $VERSION = '0.19_3';
 
 sub _getglob { no strict 'refs'; \*{ $_[0] } }
 

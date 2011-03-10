@@ -9,8 +9,8 @@ requires 'Moo'             => 0;
 requires 'DBIx::Connector' => 0;
 requires 'Sub::Install'    => 0.04;
 requires 'Sub::Exporter'   => 0.04;
-requires 'Try::Tiny'       => 0.04;
 
+build_requires 'File::Slurp'       => 0;
 build_requires 'File::Temp'        => 0;
 build_requires 'Test::More'        => 0;
 build_requires 'Test::Database'    => 0;
