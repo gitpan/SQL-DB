@@ -20,7 +20,7 @@ use Sub::Exporter -setup => {
     },
 };
 
-our $VERSION = '0.19_3';
+our $VERSION = '0.19_4';
 
 # Instance attributes
 

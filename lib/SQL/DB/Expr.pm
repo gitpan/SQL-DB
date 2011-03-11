@@ -43,7 +43,7 @@ use overload
   #    'ne'     => '_expr_ne',
   ;
 
-our $VERSION = '0.19_3';
+our $VERSION = '0.19_4';
 
 has '_txt' => (
     is       => 'rw',
@@ -135,7 +135,12 @@ sub _expr_concat {
     #Carp::carp "_expr_concat#". join('#',map { ref $_ } @_);
     #Carp::carp "_expr_concat#". join('#', @_);
     #warn caller;
-    my ( $e1, $e2 ) = @_;
+    my ( $e1, $e2, $swap ) = @_;
+    if ($swap) {
+        my $tmp = $e2;
+        $e2 = $e1;
+        $e1 = $tmp;
+    }
     my $_txt;
     my @_bvalues;
     my @_btypes;

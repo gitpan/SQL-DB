@@ -10,7 +10,12 @@ my $subs;
 
 my @handles = Test::Database->handles(qw/ SQLite Pg mysql /);
 
-plan tests => 1 * @handles;
+if (@handles) {
+    plan tests => 1 * @handles;
+}
+else {
+    plan skip_all => "No database handles to test with";
+}
 
 foreach my $handle (@handles) {
     my ( $dsn, $user, $pass ) = $handle->connection_info;

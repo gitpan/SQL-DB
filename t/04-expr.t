@@ -1,6 +1,6 @@
 use strict;
 use warnings;
-use Test::More tests => 131;
+use Test::More tests => 133;
 use Test::Differences qw/eq_or_diff/;
 use SQL::DB::Expr qw/AND OR _expr_join _bexpr_join /;
 
@@ -30,6 +30,8 @@ my $ce4 = ( ( $e1 != 6 ) . OR . ( $e2 < 3 ) );
 my $alias = SQL::DB::Expr->new( _alias => 'alias', _txt => 'junk' );
 
 is( $e1->_as_string, 'e1', 'e1 is e1' );
+
+my $extra = ' extra ';
 
 # Just the basic operators
 
@@ -181,6 +183,8 @@ foreach (
         '((e1 != ?) OR (e2 < ?)) AND e2 NOT IN (?, ?, ?)',
         [ 6, 3, 3, 4, 5 ]
     ],
+    [ $e1 .= ' extra', 'e1 extra' ],
+    [ $extra .= $e1, ' extra e1 extra' ],
 
   )
 {

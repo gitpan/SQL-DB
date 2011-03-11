@@ -24,7 +24,6 @@ xt/pod.t
 xt/pod-coverage.t
 xt/package-names.t
 t/live.t
-t/20-synopsis.t
 t/04-expr.t
 t/08-schema.t
 t/10-cursor.t
