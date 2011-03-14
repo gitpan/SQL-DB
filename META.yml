@@ -3,7 +3,7 @@ abstract: 'Perl interface to SQL Databases'
 author:
   - 'Mark Lawrence <nomad@null.net>'
 build_requires:
-  DBD::SQLite: 1.26_06
+  DBD::SQLite: 1.26
   ExtUtils::MakeMaker: 6.42
   File::Temp: 0
   Test::Database: 0
@@ -30,4 +30,4 @@ requires:
   Sub::Install: 0.04
 resources:
   license: http://opensource.org/licenses/gpl-license.php
-version: 0.19_4
+version: 0.19_5

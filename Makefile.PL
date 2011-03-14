@@ -14,7 +14,7 @@ build_requires 'File::Temp'        => 0;
 build_requires 'Test::More'        => 0;
 build_requires 'Test::Database'    => 0;
 build_requires 'Test::Differences' => 0;
-build_requires 'DBD::SQLite'       => '1.26_06';
+build_requires 'DBD::SQLite'       => '1.26';
 
 auto_install;
 

@@ -20,7 +20,7 @@ use Sub::Exporter -setup => {
     },
 };
 
-our $VERSION = '0.19_4';
+our $VERSION = '0.19_5';
 
 # Instance attributes
 
@@ -29,7 +29,7 @@ has 'verbose' => (
     default => 0,
 );
 
-has 'debug' => (
+has 'is_debug' => (
     is      => 'rw',
     default => 0,
 );
@@ -236,14 +236,14 @@ sub do {
                 my $type = $ref->{ $self->dbd } || $ref->{default};
                 $sth->bind_param( $i, undef, eval "$type" );
                 carp 'binding param ' . $i . ' with ' . $type
-                  if ( $self->debug && $self->debug > 1 );
+                  if ( $self->is_debug && $self->is_debug > 1 );
             }
             my $rv = $sth->execute( @{ $query->_bvalues } );
             $sth->finish();
             carp ''
               . $self->query_as_string( "$query", @{ $query->_bvalues } )
               . " /* Result: $rv */"
-              if ( $self->debug );
+              if ( $self->is_debug );
             return $rv;
         },
         sub {
@@ -282,13 +282,13 @@ sub sth {
                 my $type = $ref->{ $self->dbd } || $ref->{default};
                 $sth->bind_param( $i, undef, eval "$type" );
                 carp 'binding param ' . $i . ' with ' . $type
-                  if ( $self->debug && $self->debug > 1 );
+                  if ( $self->is_debug && $self->is_debug > 1 );
             }
             my $rv = $sth->execute( @{ $query->_bvalues } );
             carp ''
               . $self->query_as_string( "$query", @{ $query->_bvalues } )
               . " /* Result: $rv */"
-              if ( $self->debug );
+              if ( $self->is_debug );
             return $wantarray ? ( $sth, $rv ) : $sth;
         },
         sub {
@@ -379,7 +379,7 @@ SQL::DB - Perl interface to SQL Databases
 
 =head1 VERSION
 
-0.19. Development release.
+0.19_5. Development release.
 
 =head1 SYNOPSIS
 

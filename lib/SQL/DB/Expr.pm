@@ -43,7 +43,7 @@ use overload
   #    'ne'     => '_expr_ne',
   ;
 
-our $VERSION = '0.19_4';
+our $VERSION = '0.19_5';
 
 has '_txt' => (
     is       => 'rw',
@@ -144,6 +144,13 @@ sub _expr_concat {
     my $_txt;
     my @_bvalues;
     my @_btypes;
+    eval { $e1->_op };
+    if ( $@ ) {
+        use Data::Dumper; $Data::Dumper::Indent = 1;
+        $Data::Dumper::Maxdepth=0;
+        warn Dumper( @_ );
+        die "e1 not defined!?!?!! $@\n\n". Dumper(@_);
+    }
     my $_multi = $e1->_op ? 1 : 0;
     my $op = '';
 
