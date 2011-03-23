@@ -2,55 +2,27 @@ package SQL::DB;
 use strict;
 use warnings;
 use Moo;
-use DBIx::Connector;
 use Carp qw/croak carp cluck confess/;
+use DBIx::Connector;
 use SQL::DB::Cursor;
 use SQL::DB::Expr qw/:all/;
 use Sub::Exporter -setup => {
-    exports => [
-        qw/
-          query
-          /,
-    ],
-    groups => {
-        default => [
-            qw/
-              /
-        ],
-    },
+    exports => [qw/ query /],
+    groups  => { default => [qw/ /], },
 };
 
-our $VERSION = '0.19_5';
+our $VERSION = '0.19_6';
 
-# Instance attributes
-
-has 'verbose' => (
-    is      => 'rw',
-    default => 0,
-);
-
-has 'is_debug' => (
-    is      => 'rw',
-    default => 0,
-);
-
-has 'dsn' => ( is => 'rw', );
-
-has 'dbuser' => ( is => 'rw', );
-
-has 'dbpass' => ( is => 'rw', );
-
-has 'dbattrs' => (
-    is      => 'rw',
-    default => sub { {} },
-);
-
-has 'conn' => ( is => 'rw', );
-
-has 'dbd' => (
-    is       => 'rw',
-    init_arg => undef,
-);
+has 'debug'   => ( is => 'rw' );
+has 'dsn'     => ( is => 'rw' );
+has 'dbd'     => ( is => 'rw', init_arg => undef );
+has 'dbuser'  => ( is => 'rw' );
+has 'dbpass'  => ( is => 'rw' );
+has 'dbattrs' => ( is => 'rw', default => sub { {} } );
+has 'conn'    => ( is => 'rw' );
+has 'dry_run' => ( is => 'rw' );
+has '_current_timestamp' => ( is => 'rw', init_arg => undef );
+has '_sqlite_seq_dbh'    => ( is => 'rw', init_arg => undef );
 
 has 'prepare_mode' => (
     is  => 'rw',
@@ -60,10 +32,6 @@ has 'prepare_mode' => (
     },
     default => sub { 'prepare_cached' },
 );
-
-has 'dry_run' => ( is => 'rw' );
-
-has '_current_timestamp' => ( is => 'rw' );
 
 sub BUILD {
     my $self = shift;
@@ -86,11 +54,10 @@ sub BUILD {
                 my $h = shift;
                 if ( $dbd eq 'Pg' ) {
                     $h->do('SET client_min_messages = WARNING;');
-
-                    #                    $h->do("SET TIMEZONE TO 'UTC';");
+                    $h->do("SET TIMEZONE TO 'UTC';");
                 }
                 elsif ( $dbd eq 'SQLite' ) {
-                    $h->do('PRAGMA foreign_key = ON;');
+                    $h->do('PRAGMA foreign_keys = ON;');
                 }
                 return;
             },
@@ -100,20 +67,52 @@ sub BUILD {
     $self->conn(
         DBIx::Connector->new( $dsn, $self->dbuser, $self->dbpass, $attrs ) );
 
+    # Emulate sequence support for SQLite
+    if ( $dbd eq 'SQLite' ) {
+        my $dsn = $self->dsn . '.seq';
+        my $dbh = DBI->connect(
+            $dsn, '', '',
+            {
+                RaiseError => 1,
+                PrintError => 0,
+            }
+        );
+        $self->_sqlite_seq_dbh($dbh);
+    }
+
     $self->conn->mode('fixup');
     return $self;
 }
 
+sub current_timestamp {
+    my $self = shift;
+    return $self->_current_timestamp if $self->_current_timestamp;
+
+    my ( $sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst ) = gmtime;
+    $mon  += 1;
+    $year += 1900;
+    return sprintf( '%04d-%02d-%02d %02d:%02d:%02d',
+        $year, $mon, $mday, $hour, $min, $sec );
+}
+
 sub create_sequence {
     my $self = shift;
-    my $arg  = shift;
+    my $name = shift;
 
     if ( $self->dbd eq 'SQLite' ) {
-        my $dsn = $self->dsn . '.seq';
-        my $dbh = DBI->connect($dsn);
-        $dbh->do( 'CREATE TABLE sequence_' 
-              . $arg . ' ('
+        $self->_sqlite_seq_dbh->do( 'CREATE TABLE sequence_' 
+              . $name . ' ('
               . 'seq INTEGER PRIMARY KEY, mtime TIMESTAMP )' );
+    }
+    elsif ( $self->dbd eq 'Pg' ) {
+        $self->conn->run(
+            sub {
+                $_->do( 'CREATE SEQUENCE seq_' . $name );
+            },
+            catch => sub {
+                die $_;
+            }
+        );
     }
     else {
         die "Sequence support not implemented for " . $self->dbd;
@@ -122,15 +121,28 @@ sub create_sequence {
 
 sub nextval {
     my $self = shift;
-    my $arg  = shift;
+    my $name = shift;
 
     if ( $self->dbd eq 'SQLite' ) {
-        my $dsn = $self->dsn . '.seq';
-        my $dbh = DBI->connect($dsn);
-        $dbh->do( 'INSERT INTO sequence_' 
-              . $arg
+        warn 'INSERT INTO sequence_' 
+          . $name
+          . "(mtime) VALUES(CURRENT_TIMESTAMP)\n"
+          if $self->debug;
+        $self->_sqlite_seq_dbh->do( 'INSERT INTO sequence_' 
+              . $name
               . '(mtime) VALUES(CURRENT_TIMESTAMP)' );
-        return $dbh->sqlite_last_insert_rowid();
+        return $self->_sqlite_seq_dbh->sqlite_last_insert_rowid();
+    }
+    elsif ( $self->dbd eq 'Pg' ) {
+        warn "SELECT nextval('seq_" . $name . "')\n" if $self->debug;
+        my $val = $self->conn->run(
+            sub {
+                $_->selectrow_array( "SELECT nextval('seq_" . $name . "')" );
+            },
+            catch => sub {
+                die $_;
+            }
+        );
     }
     else {
         die "Sequence support not implemented for " . $self->dbd;
@@ -177,37 +189,7 @@ sub query_as_string {
             $sql =~ s/\?/$quote/;
         }
     }
-    return $sql;
-}
-
-sub current_timestamp {
-    my $self = shift;
-    return $self->_current_timestamp if $self->_current_timestamp;
-
-    my ( $sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst ) = gmtime;
-    $mon  += 1;
-    $year += 1900;
-    return sprintf( '%04d-%02d-%02d %02d:%02d:%02d',
-        $year, $mon, $mday, $hour, $min, $sec );
-}
-
-sub txn {
-    my $wantarray = wantarray;
-
-    my $self          = shift;
-    my $set_timestamp = !$self->_current_timestamp;
-
-    if ($set_timestamp) {
-        $self->_current_timestamp( $self->current_timestamp );
-    }
-
-    my @ret = $self->conn->txn(@_);
-
-    if ($set_timestamp) {
-        $self->_current_timestamp(undef);
-    }
-
-    return $wantarray ? @ret : $ret[0];
+    return $sql . ';';
 }
 
 sub do {
@@ -219,13 +201,13 @@ sub do {
         confess "Bad Query: $@";
     }
 
-    print $self->query_as_string( "$query", @{ $query->_bvalues } ) . "\n"
-      if $self->verbose;
+    warn $self->query_as_string( "$query", @{ $query->_bvalues } ) . "\n"
+      if $self->debug;
 
     return if $self->dry_run;
 
     return $self->conn->run(
-        no_ping => sub {
+        sub {
             my $dbh = $_;
             my $sth = $dbh->$prepare("$query");
 
@@ -235,19 +217,16 @@ sub do {
                 next unless $ref;
                 my $type = $ref->{ $self->dbd } || $ref->{default};
                 $sth->bind_param( $i, undef, eval "$type" );
-                carp 'binding param ' . $i . ' with ' . $type
-                  if ( $self->is_debug && $self->is_debug > 1 );
+                warn 'binding param ' . $i . ' with ' . $type
+                  if ( $self->debug && $self->debug > 1 );
             }
             my $rv = $sth->execute( @{ $query->_bvalues } );
             $sth->finish();
-            carp ''
-              . $self->query_as_string( "$query", @{ $query->_bvalues } )
-              . " /* Result: $rv */"
-              if ( $self->is_debug );
+            warn "-- Result: $rv" if ( $self->debug );
             return $rv;
         },
-        sub {
-            die $_ if ( $self->verbose );
+        catch => sub {
+            die $_ if ( $self->debug );
             die $self->query_as_string( "$query", @{ $query->_bvalues } )
               . "\n$_";
         }
@@ -263,15 +242,15 @@ sub sth {
         confess "Bad Query: $@";
     }
 
-    print $self->query_as_string( "$query", @{ $query->_bvalues } ) . "\n"
-      if $self->verbose;
+    warn $self->query_as_string( "$query", @{ $query->_bvalues } ) . "\n"
+      if $self->debug;
 
     return if $self->dry_run;
 
     my $wantarray = wantarray;
 
     return $self->conn->run(
-        no_ping => sub {
+        sub {
             my $dbh = $_;
             my $sth = $dbh->$prepare("$query");
 
@@ -281,18 +260,15 @@ sub sth {
                 next unless $ref;
                 my $type = $ref->{ $self->dbd } || $ref->{default};
                 $sth->bind_param( $i, undef, eval "$type" );
-                carp 'binding param ' . $i . ' with ' . $type
-                  if ( $self->is_debug && $self->is_debug > 1 );
+                warn 'binding param ' . $i . ' with ' . $type
+                  if ( $self->debug && $self->debug > 1 );
             }
             my $rv = $sth->execute( @{ $query->_bvalues } );
-            carp ''
-              . $self->query_as_string( "$query", @{ $query->_bvalues } )
-              . " /* Result: $rv */"
-              if ( $self->is_debug );
+            warn "-- Result: $rv" if ( $self->debug );
             return $wantarray ? ( $sth, $rv ) : $sth;
         },
-        sub {
-            die $_ if ( $self->verbose );
+        catch => sub {
+            die $_ if ( $self->debug );
             die $self->query_as_string( "$query", @{ $query->_bvalues } )
               . "\n$_";
         }
@@ -370,6 +346,71 @@ sub delete {
     return $self->do(@delete);
 }
 
+sub txn {
+    my $wantarray = wantarray;
+
+    my $self          = shift;
+    my $set_timestamp = !$self->_current_timestamp;
+
+    if ($set_timestamp) {
+        $self->_current_timestamp( $self->current_timestamp );
+    }
+
+    my @ret = $self->conn->txn(@_);
+
+    if ($set_timestamp) {
+        $self->_current_timestamp(undef);
+    }
+
+    return $wantarray ? @ret : $ret[0];
+}
+
+sub deploy {
+    my $self = shift;
+    my $ref  = shift;
+
+    return $self->conn->txn(
+        sub {
+            my $dbh = $_;
+
+            $dbh->do( '
+            CREATE TABLE IF NOT EXISTS _sqldb (
+                id INTEGER PRIMARY KEY,
+                sql VARCHAR,
+                perl VARCHAR
+            )
+        ' );
+
+            my $latest_change_id = $self->conn->dbh->selectrow_array(
+                'SELECT count(sql) FROM _sqldb' );
+
+            my $count = 1;
+            foreach my $cmd (@$ref) {
+                next unless ( $count > $latest_change_id );
+
+                if ( defined $cmd->[0] ) {
+                    $dbh->do($cmd);
+                }
+                elsif ( defined $cmd->[1] ) {
+                    my $str = $cmd->[1];
+                    eval $str;
+                }
+                else {
+                    die "Require SQL or Perl";
+                }
+                $dbh->do( 'INSERT INTO _sqldb(sql) VALUES(?,?,?)',
+                    undef, $count, @$cmd );
+
+                $count++;
+            }
+
+        },
+        catch => sub {
+            die $_;
+        }
+    );
+}
+
 1;
 __END__
 
@@ -379,7 +420,7 @@ SQL::DB - Perl interface to SQL Databases
 
 =head1 VERSION
 
-0.19_5. Development release.
+0.19_6. Development release.
 
 =head1 SYNOPSIS
 
@@ -1028,27 +1069,34 @@ This method can be called recursively, but any sub-transaction failure
 will always result in the outer-most transaction also being rolled
 back.
 
-=item create_sequence( @sequence )
+=item create_sequence( $name )
 
 Creates a sequence in the database. Takes the same arguments as
-L<SQL::DB::Sequence>. Sequences are emulated on systems that don't
-support them natively.
+Sequences are emulated on SQLite, used directly for PostgreSQL, and are
+unsupported for everything else.
 
-    $db->create_sequence( name => 'myseq' );
+    $db->create_sequence( 'myseq' );
 
-=item nextval( $name, $count )
+=item nextval( $name )
 
 Advance the sequence to its next value and return that value. If $count
 is specified then a array of $count values are returned and the
-sequence incremented appropriately.
+sequence incremented appropriately.  Sequences are emulated on SQLite,
+used directly for PostgreSQL, and are unsupported for everything else.
 
 =item setval( $name, $value )
 
-Reset the sequence counter value.
+Unimplemented.
 
 =item drop_sequence( $name )
 
-Drops sequence $name from the database.
+Unimplemented.
+
+=item deploy( $array_ref )
+
+Deploy the [SQL,Perl] pairs contained in $array_ref to the database.
+Only $array_ref elements greater than the previous deployment count
+(stored in the _sqldb table) will be deployed.
 
 =back
 

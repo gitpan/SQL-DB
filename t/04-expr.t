@@ -2,7 +2,7 @@ use strict;
 use warnings;
 use Test::More tests => 133;
 use Test::Differences qw/eq_or_diff/;
-use SQL::DB::Expr qw/AND OR _expr_join _bexpr_join /;
+use SQL::DB::Expr qw/AND OR _bexpr _expr_join _bexpr_join /;
 
 can_ok(
     'SQL::DB::Expr', qw/
@@ -15,6 +15,8 @@ can_ok(
       _expr_join
       _bexpr_join
       _expr_binary
+      AND
+      OR
       /
 );
 
@@ -73,29 +75,29 @@ foreach (
     [ $e1 - $e2,        'e1 - e2' ],
     [ $e1->is_null,     'e1 IS NULL' ],
     [ $e1->is_not_null, 'e1 IS NOT NULL' ],
-    [ $e1->in( $e1, $e2 ), 'e1 IN (e1, e2)' ],
-    [ $e1->not_in( $e1, $e2 ), 'e1 NOT IN (e1, e2)' ],
+    [ $e1->in( $e1, $e2 ), 'e1 IN (e1,e2)' ],
+    [ $e1->not_in( $e1, $e2 ), 'e1 NOT IN (e1,e2)' ],
     [
         $e1->in( 9, 10, 11 ),
-        'e1 IN (?, ?, ?)',
+        'e1 IN (?,?,?)',
         [ 9,     10,    11 ],
         [ undef, undef, undef ]
     ],
     [
         $e1->not_in( 12, 13, 14 ),
-        'e1 NOT IN (?, ?, ?)',
+        'e1 NOT IN (?,?,?)',
         [ 12,    13,    14 ],
         [ undef, undef, undef ]
     ],
     [
         $e2->in( 9, 10, 11 ),
-        'e2 IN (?, ?, ?)',
+        'e2 IN (?,?,?)',
         [ 9, 10, 11 ],
         [ { default => 100 }, { default => 100 }, { default => 100 } ]
     ],
     [
         $e2->not_in( 12, 13, 14 ),
-        'e2 NOT IN (?, ?, ?)',
+        'e2 NOT IN (?,?,?)',
         [ 12, 13, 14 ],
         [ { default => 100 }, { default => 100 }, { default => 100 } ]
     ],
@@ -177,15 +179,14 @@ foreach (
     ],
     [ $ce2 . AND . !$ce3, '(e1 OR e2) AND NOT ((e1 AND e2) AND (e1 OR e2))' ],
     [ $ce4, '(e1 != ?) OR (e2 < ?)', [ 6, 3 ] ],
-    [ $e2->not_in( 3, 4, 5 ), 'e2 NOT IN (?, ?, ?)', [ 3, 4, 5 ] ],
+    [ $e2->not_in( 3, 4, 5 ), 'e2 NOT IN (?,?,?)', [ 3, 4, 5 ] ],
     [
         $ce4 . AND . $e2->not_in( 3, 4, 5 ),
-        '((e1 != ?) OR (e2 < ?)) AND e2 NOT IN (?, ?, ?)',
+        '((e1 != ?) OR (e2 < ?)) AND e2 NOT IN (?,?,?)',
         [ 6, 3, 3, 4, 5 ]
     ],
     [ $e1 .= ' extra', 'e1 extra' ],
     [ $extra .= $e1, ' extra e1 extra' ],
-
   )
 {
 

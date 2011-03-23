@@ -1,4 +1,6 @@
 package SQL::DB::Expr;
+use strict;
+use warnings;
 use Moo;
 use Carp qw/ carp croak confess/;
 use Sub::Exporter -setup => {
@@ -12,12 +14,7 @@ use Sub::Exporter -setup => {
           _bexpr_join
           /
     ],
-    groups => {
-        default => [
-            qw/
-              /
-        ],
-    },
+    groups => { default => [qw/ /], },
 };
 
 use overload
@@ -35,15 +32,12 @@ use overload
   '-'      => '_expr_sub',
   '*'      => '_expr_mult',
   '/'      => '_expr_divide',
-  '.='     => '_expr_concat',
-  '.'      => '_expr_concat2',
+  '.'      => '_expr_concat',
+  '.='     => '_expr_addstr',
   fallback => 1,
-
-  #    'eq'     => '_expr_eq',
-  #    'ne'     => '_expr_ne',
   ;
 
-our $VERSION = '0.19_5';
+our $VERSION = '0.19_6';
 
 has '_txt' => (
     is       => 'rw',
@@ -106,7 +100,7 @@ sub BUILD {
     }
 }
 
-sub clone {
+sub _clone {
     my $self = shift;
     bless {%$self}, ref $self;
 }
@@ -129,55 +123,34 @@ sub _bvalues_sql {
     return '';
 }
 
-sub _expr_concat {
-
-    #no warnings 'uninitialized';
-    #Carp::carp "_expr_concat#". join('#',map { ref $_ } @_);
-    #Carp::carp "_expr_concat#". join('#', @_);
-    #warn caller;
-    my ( $e1, $e2, $swap ) = @_;
-    if ($swap) {
-        my $tmp = $e2;
-        $e2 = $e1;
-        $e1 = $tmp;
-    }
-    my $_txt;
-    my @_bvalues;
-    my @_btypes;
-    eval { $e1->_op };
-    if ( $@ ) {
-        use Data::Dumper; $Data::Dumper::Indent = 1;
-        $Data::Dumper::Maxdepth=0;
-        warn Dumper( @_ );
-        die "e1 not defined!?!?!! $@\n\n". Dumper(@_);
-    }
-    my $_multi = $e1->_op ? 1 : 0;
-    my $op = '';
+sub _expr_addstr {
+    my ( $e1, $e2 ) = @_;
 
     # The argument is undef
     defined $e2
-      or Carp::carp('Use of uninitialized value in concatenation (.) or string')
+      or Carp::carp('Use of uninitialized value in concatenation (.=)')
       and return $e1;
 
-    use Data::Dumper;
-    $Data::Dumper::Indent   = 1;
-    $Data::Dumper::Maxdepth = 2;
+    #    no warnings 'uninitialized';
+    #Carp::carp "_expr_concat#". join('#',map { ref $_ } @_);
+    #    Carp::carp "_expr_addstr(". join(' ### ',
+    #        map { defined $_ ? $_ : 'undef'} @_) .")";
+    #warn caller;
 
-    #warn Dumper($e2);
+    my $_txt;
+    my @_bvalues;
+    my @_btypes;
+    my $_multi = $e1->_op ? 1 : 0;
+    my $op = '';
+
     # The argument is one of us
-    if ( eval { ref $e2 ? $e2->isa(__PACKAGE__) : 0 } ) {
+    if ( eval { $e2->isa(__PACKAGE__) } ) {
         if ( my $op = delete $e1->{_op} || delete $e2->{_op} ) {
             $op =~ s/\s+//g;
             return _expr_binary( $op, $e1, $e2, undef, 1 );
         }
         my $op;
         if ( $e2->_txt eq ' AND ' or $e2->_txt eq ' OR ' ) {
-
-    #        warn "$e1";
-    #            croak ".AND. or .OR. only work with complex expressions. "
-    #                    . "(Missing brackets around previous/next expression?)"
-    #                    unless $e1->_multi;
-
             ( $op = $e2->_txt ) =~ s/\s+//g;
         }
         return __PACKAGE__->new(
@@ -205,26 +178,29 @@ sub _expr_concat {
     );
 }
 
-sub _expr_concat2 {
+sub _expr_concat {
+    no warnings 'uninitialized';
 
-    #no warnings 'uninitialized';
-    #Carp::carp "_expr_concat2(". join('#',map { ref $_ } @_);
-    #Carp::carp "_expr_concat2(". join('#', @_);
+    #Carp::carp "_expr_concat#". join('#',map { ref $_ } @_);
+    #    warn "_expr_concat( ". join(' ### ',
+    #        map { defined $_ ? $_ : 'undef'} @_) .")";
+    #    warn "_expr_concat( ". join(' ### ',
+    #        map { ref $_ } @_) .")";
     #warn caller;
+
     my ( $e1, $e2, $swap ) = @_;
 
-    return $e1->_expr_concat($e2) unless $swap;
+    defined $e2
+      or Carp::carp('Use of uninitialized value in concatenation (.) or string')
+      and return $e1;
+
+    return $e1->_expr_addstr($e2) unless $swap;
 
     my $_txt;
     my @_bvalues;
     my @_btypes;
     my $_multi = $e1->_op ? 1 : 0;
     my $op = '';
-
-    # The argument is undef
-    defined $e2
-      or Carp::carp('Use of uninitialized value in concatenation (.) or string')
-      and return $e1;
 
     # The argument is one of us
     if ( eval { ref $e2 ? $e2->isa(__PACKAGE__) : 0 } ) {
@@ -267,7 +243,7 @@ sub _expr_concat2 {
 sub _expr_not {
     my $e1   = shift;
     my $_txt = 'NOT ' . $e1->_as_string(1);
-    my $expr = $e1->clone;
+    my $expr = $e1->_clone;
     $expr->{_txt}   = $_txt;
     $expr->{_multi} = undef;
     return $expr;
@@ -289,23 +265,18 @@ sub is_null      { $_[0] . ' IS NULL' }
 sub is_not_null  { $_[0] . ' IS NOT NULL' }
 
 sub in {
-    my $e1   = shift;
-    my $last = pop @_;
-    my $_txt = $e1 . ' IN (';
-    map { $_txt .= _bexpr( $_, $e1->_btype ) . ', ' } @_;
-    $_txt .= _bexpr( $last, $e1->_btype );
-    $_txt .= ')';
-    return $_txt;
+    my $e1 = shift;
+    return
+      $e1 . ' IN ('
+      . _expr_join( ',', map { _bexpr( $_, $e1->_btype ) } @_ ) . ')';
 }
 
 sub not_in {
-    my $e1   = shift;
-    my $last = pop @_;
-    my $_txt = $e1 . ' NOT IN (';
-    map { $_txt .= _bexpr( $_, $e1->_btype ) . ', ' } @_;
-    $_txt .= _bexpr( $last, $e1->_btype );
-    $_txt .= ')';
-    return $_txt;
+    my $e1 = shift;
+    return
+        $e1
+      . ' NOT IN ('
+      . _expr_join( ',', map { _bexpr( $_, $e1->_btype ) } @_ ) . ')';
 }
 
 sub between {
@@ -562,10 +533,9 @@ The operator of the expression in the case that it is binary.
 
 =item BUILD
 
-Part of the object instantiation phase. Documented here to keep
-Test::Pod happy.
+A subroutine called during an object's instantiation phase.
 
-=item clone
+=item _clone
 
 Makes a deep copy of the object.
 
@@ -678,18 +648,18 @@ The following functions are exported on demand.
 
 =over 4
 
-=item _bexpr( $item )
+=item _bexpr( $item [,$bind_type] )
 
 Return $item if it is already an expression, or a new SQL::DB::Expr
-object otherwise.
+object otherwise. The optional $bind_type specifies the DBI bind_type.
 
 =item _expr_binary( $op, $e1, $e2, $swap )
 
-An internal method for building binary operator expressions.
+A method for building binary operator expressions.
 
 =item _expr_join( $separator, @expressions )
 
-Does the same as Perl's 'join' built-in but for SQL::DB::Expr objects.
+Does the same as Perl's 'join' built-in. but for SQL::DB::Expr objects.
 See BUGS below for why this is needed.
 
 =item _bexpr_join( $separator, @expressions )
@@ -731,7 +701,7 @@ Mark Lawrence E<lt>nomad@null.netE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2007-2010 Mark Lawrence <nomad@null.net>
+Copyright (C) 2007-2011 Mark Lawrence <nomad@null.net>
 
 This program is free software; you can redistribute it and/or modify it
 under the terms of the GNU General Public License as published by the

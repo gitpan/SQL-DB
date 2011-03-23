@@ -16,6 +16,8 @@ build_requires 'Test::Database'    => 0;
 build_requires 'Test::Differences' => 0;
 build_requires 'DBD::SQLite'       => '1.26';
 
+repository 'http://github.com/mlawren/sql-db.git/';
+
 auto_install;
 
 WriteAll;

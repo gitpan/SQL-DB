@@ -50,7 +50,7 @@ use Sub::Exporter -setup => {
     },
 };
 
-our $VERSION = '0.19_5';
+our $VERSION = '0.19_6';
 
 sub _getglob { no strict 'refs'; \*{ $_[0] } }
 
@@ -358,41 +358,13 @@ sub sql_lower {
 sub sql_case {
     @_ || croak 'case([$expr,] when => $expr, then => $val,[else...])';
 
-    my @bind;
+    my @items = map {
+        ( ref $_ eq '' && $_ =~ m/^((when)|(then)|(else))$/i )
+          ? uc($_)
+          : _bexpr($_)
+    } @_;
 
-    my $str = 'CASE';
-    if ( $_[0] !~ /^when$/i ) {
-
-        # FIXME more cleaning? What can be injected here?
-        my $expr = shift;
-        $expr =~ s/\sEND\W.*//gi;
-        $str .= ' ' . $expr;
-    }
-
-    UNIVERSAL::isa( $_, 'SQL::DB::Expr' ) && push( @bind, $_->bind_values );
-
-    my @vals;
-
-    while ( my ( $p, $v ) = splice( @_, 0, 2 ) ) {
-        ( $p =~ m/(^when$)|(^then$)|(^else$)/ )
-          || croak 'case($expr, when => $cond, then => $val, [else...])';
-
-        if ( UNIVERSAL::isa( $v, 'SQL::DB::Expr' ) ) {
-            $str .= ' ' . uc($p) . ' ' . $v;
-            push( @bind, $v->bind_values );
-        }
-        else {
-            $str .= ' ' . uc($p) . ' ?';
-            push( @bind, $v );
-        }
-    }
-
-    @_ && croak 'case($expr, when => $cond, then => $val,...)';
-
-    return SQL::DB::Expr->new(
-        val         => $str . ' END',
-        bind_values => \@bind
-    );
+    return _expr_join( ' ', 'CASE', @items, 'END' );
 }
 
 1;

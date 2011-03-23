@@ -3,7 +3,7 @@ use Moo;
 use Sub::Install qw/install_sub/;
 use Carp qw(croak);
 
-our $VERSION = '0.19_5';
+our $VERSION = '0.19_6';
 
 has 'sth' => (
     is       => 'ro',

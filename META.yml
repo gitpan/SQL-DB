@@ -30,4 +30,5 @@ requires:
   Sub::Install: 0.04
 resources:
   license: http://opensource.org/licenses/gpl-license.php
-version: 0.19_5
+  repository: http://github.com/mlawren/sql-db.git/
+version: 0.19_6
