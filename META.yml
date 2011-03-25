@@ -1,5 +1,5 @@
 ---
-abstract: 'Perl interface to SQL Databases'
+abstract: 'Perl/SQL database interface'
 author:
   - 'Mark Lawrence <nomad@null.net>'
 build_requires:
@@ -31,4 +31,4 @@ requires:
 resources:
   license: http://opensource.org/licenses/gpl-license.php
   repository: http://github.com/mlawren/sql-db.git/
-version: 0.19_6
+version: 0.19_7

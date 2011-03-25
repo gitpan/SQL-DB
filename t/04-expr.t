@@ -1,6 +1,6 @@
 use strict;
 use warnings;
-use Test::More tests => 133;
+use Test::More tests => 137;
 use Test::Differences qw/eq_or_diff/;
 use SQL::DB::Expr qw/AND OR _bexpr _expr_join _bexpr_join /;
 
@@ -32,6 +32,10 @@ my $ce4 = ( ( $e1 != 6 ) . OR . ( $e2 < 3 ) );
 my $alias = SQL::DB::Expr->new( _alias => 'alias', _txt => 'junk' );
 
 is( $e1->_as_string, 'e1', 'e1 is e1' );
+is $e1 . ' after', 'e1 after', 'after';
+is 'before ' . $e1, 'before e1', 'before';
+is $e1 . $e2, 'e1e2', 'e1e2';
+is $e2 . $e1, 'e2e1', 'e2e1';
 
 my $extra = ' extra ';
 
@@ -130,38 +134,33 @@ foreach (
     [ $e1->like('stuff'), 'e1 LIKE ?', ['stuff'], [undef] ],
     [ $e2->like('stuff'), 'e2 LIKE ?', ['stuff'], [ { default => 100 } ] ],
     [ $e1->as('junk'), 'e1 AS junk' ],
-    [ ( $e1 == $e2 ) . AND . ( $e1 == $e2 ), '(e1 = e2) AND (e1 = e2)' ],
+    [ ( $e1 == $e2 ) . AND . ( $e1 == $e2 ), 'e1 = e2 AND e1 = e2' ],
     [
         ( ( $e1 == $e2 ) . AND . ( $e1 == $e2 ) )->as('junk'),
-        '((e1 = e2) AND (e1 = e2)) AS junk'
+        '(e1 = e2 AND e1 = e2) AS junk'
     ],
-    [ ( $e1 == $e2 ) . OR . ( $e1 == $e2 ), '(e1 = e2) OR (e1 = e2)' ],
-    [ ( $e1 == $e2 ) . AND . !( $e1 == $e2 ), '(e1 = e2) AND NOT (e1 = e2)' ],
-    [ ( $e1 == $e2 ) . OR . !( $e1 == $e2 ),  '(e1 = e2) OR NOT (e1 = e2)' ],
-    [ !( $e1 == $e2 ) . AND . ( $e1 == $e2 ), 'NOT (e1 = e2) AND (e1 = e2)' ],
-    [ !( $e1 == $e2 ) . OR .  ( $e1 == $e2 ), 'NOT (e1 = e2) OR (e1 = e2)' ],
-    [
-        !( $e1 == $e2 ) . AND . !( $e1 == $e2 ),
-        'NOT (e1 = e2) AND NOT (e1 = e2)'
-    ],
-    [
-        !( $e1 == $e2 ) . OR . !( $e1 == $e2 ), 'NOT (e1 = e2) OR NOT (e1 = e2)'
-    ],
+    [ ( $e1 == $e2 ) . OR . ( $e1 == $e2 ), 'e1 = e2 OR e1 = e2' ],
+    [ ( $e1 == $e2 ) . AND . !( $e1 == $e2 ), 'e1 = e2 AND NOT e1 = e2' ],
+    [ ( $e1 == $e2 ) . OR . !( $e1 == $e2 ),  'e1 = e2 OR NOT e1 = e2' ],
+    [ !( $e1 == $e2 ) . AND . ( $e1 == $e2 ), 'NOT e1 = e2 AND e1 = e2' ],
+    [ !( $e1 == $e2 ) . OR .  ( $e1 == $e2 ), 'NOT e1 = e2 OR e1 = e2' ],
+    [ !( $e1 == $e2 ) . AND . !( $e1 == $e2 ), 'NOT e1 = e2 AND NOT e1 = e2' ],
+    [ !( $e1 == $e2 ) . OR . !( $e1 == $e2 ),  'NOT e1 = e2 OR NOT e1 = e2' ],
     [
         !( !( $e1 == $e2 ) . OR . !( $e1 == $e2 ) ),
-        'NOT (NOT (e1 = e2) OR NOT (e1 = e2))'
+        'NOT (NOT e1 = e2 OR NOT e1 = e2)'
     ],
     [
           ( ( $e1 == $e2 ) . OR . !( $e1 == $e2 ) ) 
         . AND
           . !( !( $e1 == $e2 ) . OR . !( $e1 == $e2 ) ),
-        '((e1 = e2) OR NOT (e1 = e2)) AND NOT (NOT (e1 = e2) OR NOT (e1 = e2))'
+        '(e1 = e2 OR NOT e1 = e2) AND NOT (NOT e1 = e2 OR NOT e1 = e2)'
     ],
 
 #    [$e1 == ($e1 .OR. ($e2 .AND. ($e1 == $e2))), 'e1 = e1 OR (e2 AND e1 = e2)'],
     [
         $e1->between( 3, 34 ) . AND . $ce3,
-        '(e1 BETWEEN ? AND ?) AND ((e1 AND e2) AND (e1 OR e2))',
+        'e1 BETWEEN ? AND ? AND ((e1 AND e2) AND (e1 OR e2))',
         [ 3, 34 ]
     ],
     [ !$ce1,            'NOT (e1 AND e2)' ],
@@ -178,11 +177,11 @@ foreach (
         'NOT ((e1 OR e2) AND ((e1 AND e2) AND (e1 OR e2)))'
     ],
     [ $ce2 . AND . !$ce3, '(e1 OR e2) AND NOT ((e1 AND e2) AND (e1 OR e2))' ],
-    [ $ce4, '(e1 != ?) OR (e2 < ?)', [ 6, 3 ] ],
+    [ $ce4, 'e1 != ? OR e2 < ?', [ 6, 3 ] ],
     [ $e2->not_in( 3, 4, 5 ), 'e2 NOT IN (?,?,?)', [ 3, 4, 5 ] ],
     [
         $ce4 . AND . $e2->not_in( 3, 4, 5 ),
-        '((e1 != ?) OR (e2 < ?)) AND e2 NOT IN (?,?,?)',
+        '(e1 != ? OR e2 < ?) AND e2 NOT IN (?,?,?)',
         [ 6, 3, 3, 4, 5 ]
     ],
     [ $e1 .= ' extra', 'e1 extra' ],

@@ -10,11 +10,9 @@ inc/Module/Install/Makefile.pm
 inc/Module/Install/Metadata.pm
 inc/Module/Install/Win32.pm
 inc/Module/Install/WriteAll.pm
-lib/SQL/DB/Expr.pm
-lib/SQL/DB/Schema.pm
-lib/SQL/DB/Tutorial.pod
-lib/SQL/DB/Cursor.pm
 lib/SQL/DB.pm
+lib/SQL/DB/Expr.pm
+lib/SQL/DB/Cursor.pm
 Makefile.PL
 MANIFEST
 MANIFEST.SKIP
@@ -23,7 +21,7 @@ README
 xt/pod.t
 xt/pod-coverage.t
 xt/package-names.t
-t/live.t
+t/01-sqldb.t
 t/04-expr.t
-t/08-schema.t
 t/10-cursor.t
+t/live.t

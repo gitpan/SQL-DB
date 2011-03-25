@@ -32,54 +32,46 @@ use overload
   '-'      => '_expr_sub',
   '*'      => '_expr_mult',
   '/'      => '_expr_divide',
-  '.'      => '_expr_concat',
+  '.'      => '_expr_addstr',
   '.='     => '_expr_addstr',
   fallback => 1,
   ;
 
-our $VERSION = '0.19_6';
+our $VERSION = '0.19_7';
 
 has '_txt' => (
     is       => 'rw',
     required => 1,
-    writer   => '_set_txt',
 );
 
-has '_alias' => (
-    is     => 'rw',
-    writer => '_set_alias',
-);
+has '_alias' => ( is => 'rw', );
 
 has '_btype' => (
-    is => 'ro',
+    is => 'rw',
 
     #    isa => sub { die "Must be HASH ref: $_[0]" unless ref $_[0] eq 'HASH'},
 );
 
 has '_bvalues' => (
-    is  => 'ro',
+    is  => 'rw',
     isa => sub { die "Must be ARRAY ref" unless ref $_[0] eq 'ARRAY' },
     default => sub { [] },
 );
 
 has '_btypes' => (
-    is  => 'ro',
+    is  => 'rw',
     isa => 'ArrayRef',
     isa => sub { die "Must be ARRAY ref" unless ref $_[0] eq 'ARRAY' },
     default => sub { [] },
 );
 
 has '_op' => (
-    is      => 'ro',
+    is      => 'rw',
     default => '',
 );
 
 has '_multi' => (
-    is  => 'ro',
-    isa => sub {
-        confess "Must be undef, 0 or 1"
-          unless ( !defined $_[0] || ( $_[0] == 0 or $_[0] == 1 ) );
-    },
+    is      => 'rw',
     default => sub { 0 },
 );
 
@@ -95,8 +87,8 @@ sub BUILD {
             $i++;
         }
         $tcount->{$name}->[$i] = 1;
-        $self->_set_alias( $name . $i );
-        $self->_set_txt( $name . ' AS ' . $name . $i );
+        $self->_alias( $name . $i );
+        $self->_txt( $name . ' AS ' . $name . $i );
     }
 }
 
@@ -109,8 +101,10 @@ sub _as_string {
     my $self     = shift;
     my $internal = shift;
 
-    return $self->_txt unless $internal;
-    return $self->_multi ? '(' . $self->_txt . ')' : $self->_txt;
+    if ( $internal and $self->_multi > 1 ) {
+        return '(' . $self->_txt . ')';
+    }
+    return $self->_txt;
 }
 
 sub _bvalues_sql {
@@ -124,145 +118,103 @@ sub _bvalues_sql {
 }
 
 sub _expr_addstr {
-    my ( $e1, $e2 ) = @_;
-
-    # The argument is undef
-    defined $e2
-      or Carp::carp('Use of uninitialized value in concatenation (.=)')
-      and return $e1;
-
-    #    no warnings 'uninitialized';
-    #Carp::carp "_expr_concat#". join('#',map { ref $_ } @_);
-    #    Carp::carp "_expr_addstr(". join(' ### ',
-    #        map { defined $_ ? $_ : 'undef'} @_) .")";
-    #warn caller;
-
-    my $_txt;
-    my @_bvalues;
-    my @_btypes;
-    my $_multi = $e1->_op ? 1 : 0;
-    my $op = '';
-
-    # The argument is one of us
-    if ( eval { $e2->isa(__PACKAGE__) } ) {
-        if ( my $op = delete $e1->{_op} || delete $e2->{_op} ) {
-            $op =~ s/\s+//g;
-            return _expr_binary( $op, $e1, $e2, undef, 1 );
-        }
-        my $op;
-        if ( $e2->_txt eq ' AND ' or $e2->_txt eq ' OR ' ) {
-            ( $op = $e2->_txt ) =~ s/\s+//g;
-        }
-        return __PACKAGE__->new(
-            _txt => $e1->_as_string(1) . ( $op ? '' : $e2->_as_string(1) ),
-            _bvalues => [ @{ $e1->_bvalues }, @{ $e2->_bvalues } ],
-            _btypes  => [ @{ $e1->_btypes },  @{ $e2->_btypes } ],
-
-            #            _multi => $e1->_multi || $e2->_multi,
-            _op => $op,
-        );
-    }
-
-    if ( $e1->_txt eq ' AND ' or $e1->_txt eq ' OR ' ) {
-        croak ".AND. or .OR. only work with expressions. "
-          . "(Missing brackets around previous/next expression?)";
-    }
-
-    # The argument is something else
-    return __PACKAGE__->new(
-        _txt     => $e1->_as_string(1) . $e2,
-        _bvalues => [ @{ $e1->_bvalues } ],
-        _btypes  => [ @{ $e1->_btypes } ],
-        _multi   => $e1->_multi,
-        _op      => $e1->_op,
-    );
-}
-
-sub _expr_concat {
-    no warnings 'uninitialized';
-
-    #Carp::carp "_expr_concat#". join('#',map { ref $_ } @_);
-    #    warn "_expr_concat( ". join(' ### ',
-    #        map { defined $_ ? $_ : 'undef'} @_) .")";
-    #    warn "_expr_concat( ". join(' ### ',
-    #        map { ref $_ } @_) .")";
-    #warn caller;
-
     my ( $e1, $e2, $swap ) = @_;
 
-    defined $e2
-      or Carp::carp('Use of uninitialized value in concatenation (.) or string')
-      and return $e1;
+    # The argument is undef
+    if ( !defined $e2 ) {
+        Carp::carp('Use of uninitialized value in concatenation (. or .=)');
+        return $e1;
+    }
 
-    return $e1->_expr_addstr($e2) unless $swap;
+    # Trying to catch some cpantesters errors
+    if ( !ref $e1 ) {
+        no warnings;
+        warn "ERROR: _expr_addstr called with unblessed reference?";
+        use Data::Dumper;
+        $Data::Dumper::Indent   = 1;
+        $Data::Dumper::Maxdepth = 2;
+        warn Dumper(@_);
+        warn Dumper( $e1, $e2 );
+    }
 
-    my $_txt;
-    my @_bvalues;
-    my @_btypes;
-    my $_multi = $e1->_op ? 1 : 0;
-    my $op = '';
-
-    # The argument is one of us
-    if ( eval { ref $e2 ? $e2->isa(__PACKAGE__) : 0 } ) {
-        if ( my $op = delete $e1->{_op} || delete $e2->{_op} ) {
-            $op =~ s/\s+//g;
-            return _expr_binary( $op, $e1, $e2, undef, 1 );
-        }
-
-        my $op;
-        if ( $e2->_txt eq ' AND ' or $e2->_txt eq ' OR ' ) {
-            ( $op = $e2->_txt ) =~ s/\s+//g;
+    # When the argument is not an expression...
+    unless ( eval { $e2->isa(__PACKAGE__) } ) {
+        if ( $e1->_txt eq ' AND ' or $e1->_txt eq ' OR ' ) {
+            croak ".AND. or .OR. only work with expressions. "
+              . "(Missing brackets around previous/next expression?)";
         }
 
         return __PACKAGE__->new(
-            _txt => $e2->_txt . $e1->_txt,
-            _txt => ( $op ? '' : $e2->_as_string(1) ) . $e1->_as_string(1),
-            _bvalues => [ @{ $e2->_bvalues }, @{ $e1->_bvalues } ],
-            _btypes  => [ @{ $e2->_btypes },  @{ $e1->_btypes } ],
-            _multi => $e2->_multi || $e1->_multi,
-            _op => $op,
+            _txt => $swap
+            ? $e2 . $e1->_as_string(1)
+            : $e1->_as_string(1) . $e2,
+            _bvalues => [ @{ $e1->_bvalues } ],
+            _btypes  => [ @{ $e1->_btypes } ],
+            _multi   => $e1->_multi,
+            _op      => $e1->_op,
         );
     }
 
-    if ( $e1->_txt eq ' AND ' or $e1->_txt eq ' OR ' ) {
-        croak ".AND. or .OR. only work with expressions."
-          . "(Missing brackets around previous/next expression?)";
+    # The argument must be a kind of SQL::DB::Expr...
+
+    # Arg is the result of a previous AND or OR
+    if ( my $op = $e1->_op || $e2->_op ) {
+        $e1->_op(undef);
+        $e2->_op(undef);
+        $op =~ s/\s+//g;
+        return _expr_binary( $op, $e1, $e2, undef, 2 ) unless $swap;
+        return _expr_binary( $op, $e2, $e1, undef, 2 );
     }
 
-    # The argument is something else
-    # FIXME try only modifying $e1 here instead of creating new object
+    # We should only encounter AND or OR on the RHS:
+    my $op;
+    if ( $e2->_txt eq ' AND ' or $e2->_txt eq ' OR ' ) {
+        ( $op = $e2->_txt ) =~ s/\s+//g;
+    }
+
     return __PACKAGE__->new(
-        _txt     => $e2 . $e1->_txt,
-        _bvalues => [ @{ $e1->_bvalues } ],
-        _btypes  => [ @{ $e1->_btypes } ],
-        _multi   => $e1->_multi,
-        _op      => $e1->_op,
+        _txt => $e1->_as_string(1) . ( $op ? '' : $e2->_as_string(1) ),
+        _bvalues => [ @{ $e1->_bvalues }, @{ $e2->_bvalues } ],
+        _btypes  => [ @{ $e1->_btypes },  @{ $e2->_btypes } ],
+        _op      => $op,
     );
 }
 
 sub _expr_not {
     my $e1   = shift;
-    my $_txt = 'NOT ' . $e1->_as_string(1);
     my $expr = $e1->_clone;
-    $expr->{_txt}   = $_txt;
-    $expr->{_multi} = undef;
+    $expr->_txt( 'NOT ' . $e1->_as_string(1) );
+    $expr->_multi(0);
     return $expr;
 }
 
-sub _expr_eq     { _expr_binary( '=',  @_ ) }
-sub _expr_ne     { _expr_binary( '!=', @_ ) }
-sub _expr_bitand { _expr_binary( '&',  @_ ) }
-sub _expr_bitor  { _expr_binary( '|',  @_ ) }
-sub _expr_lt     { _expr_binary( '<',  @_ ) }
-sub _expr_gt     { _expr_binary( '>',  @_ ) }
-sub _expr_lte    { _expr_binary( '<=', @_ ) }
-sub _expr_gte    { _expr_binary( '>=', @_ ) }
-sub _expr_add    { _expr_binary( '+',  @_ ) }
-sub _expr_sub    { _expr_binary( '-',  @_ ) }
-sub _expr_mult   { _expr_binary( '*',  @_ ) }
-sub _expr_divide { _expr_binary( '/',  @_ ) }
-sub is_null      { $_[0] . ' IS NULL' }
-sub is_not_null  { $_[0] . ' IS NOT NULL' }
+sub _expr_eq { _expr_binary( '=', @_ ) }
+
+sub _expr_ne { _expr_binary( '!=', @_ ) }
+
+sub _expr_bitand { _expr_binary( '&', @_ ) }
+
+sub _expr_bitor { _expr_binary( '|', @_ ) }
+
+sub _expr_lt { _expr_binary( '<', @_ ) }
+
+sub _expr_gt { _expr_binary( '>', @_ ) }
+
+sub _expr_lte { _expr_binary( '<=', @_ ) }
+
+sub _expr_gte { _expr_binary( '>=', @_ ) }
+
+sub _expr_add { _expr_binary( '+', @_ ) }
+
+sub _expr_sub { _expr_binary( '-', @_ ) }
+
+sub _expr_mult { _expr_binary( '*', @_ ) }
+
+sub _expr_divide { _expr_binary( '/', @_ ) }
+
+sub is_null { $_[0] . ' IS NULL' }
+
+sub is_not_null { $_[0] . ' IS NOT NULL' }
 
 sub in {
     my $e1 = shift;
@@ -288,7 +240,7 @@ sub between {
       . ' BETWEEN '
       . _bexpr( $_[0], $e1->_btype ) . ' AND '
       . _bexpr( $_[1], $e1->_btype );
-    $expr->{_multi} = 1;
+    $expr->_multi(1);
     return $expr;
 }
 
@@ -301,7 +253,7 @@ sub not_between {
       . ' NOT BETWEEN '
       . _bexpr( $_[0], $e1->_btype ) . ' AND '
       . _bexpr( $_[1], $e1->_btype );
-    $expr->{_multi} = 1;
+    $expr->_multi(1);
     return $expr;
 }
 
@@ -311,7 +263,7 @@ sub as {
 
     $as = ' AS ' . $as;    # this must be done first
     my $expr = $e1 . $as;
-    $expr->{_multi} = 0;
+    $expr->_multi(0);
     return $expr;
 }
 
@@ -380,14 +332,7 @@ sub _bexpr_join {
 }
 
 sub _expr_binary {
-
-    #no warnings 'uninitialized';
-    #Carp::carp "_expr_binary#". join('#',map { ref $_ } @_);
-    #Carp::carp "_expr_binary#". join('#', @_);
     my ( $op, $e1, $e2, $swap, $_multi ) = @_;
-
-    #    $e1->dump;
-    #    exit;
 
     if ($swap) {
         my $tmp = $e1;
@@ -401,7 +346,7 @@ sub _expr_binary {
       . _bexpr( $e2, eval { $e1->_btype } );
 
     # FIXME what' the right behaviour here?
-    $expr->{_multi} = $_multi || 1;
+    $expr->_multi( $_multi || 1 );
     return $expr;
 }
 

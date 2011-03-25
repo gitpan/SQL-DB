@@ -4,7 +4,12 @@ use warnings;
 use lib 't/lib';
 use Test::More;
 use Test::Database;
+use File::Temp qw/tempdir/;
+use Cwd;
 use SQL::DB;
+
+my $cwd;
+BEGIN { $cwd = getcwd }
 
 my $subs;
 
@@ -17,7 +22,12 @@ else {
     plan skip_all => "No database handles to test with";
 }
 
+my $tempdir;
 foreach my $handle (@handles) {
+    chdir $cwd || die "chdir: $!";
+    $tempdir = tempdir( CLEANUP => 1 );
+    chdir $tempdir || die "chdir: $!";
+
     my ( $dsn, $user, $pass ) = $handle->connection_info;
 
     my $db = SQL::DB->new(
@@ -30,5 +40,11 @@ foreach my $handle (@handles) {
 }
 
 done_testing();
+
+# So that File::Temp doesn't complain if it can't remove $tempdir when
+# $tempdir goes out of scope;
+END {
+    chdir $cwd;
+}
 
 1;

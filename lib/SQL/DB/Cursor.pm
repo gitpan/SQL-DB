@@ -3,7 +3,7 @@ use Moo;
 use Sub::Install qw/install_sub/;
 use Carp qw(croak);
 
-our $VERSION = '0.19_6';
+our $VERSION = '0.19_7';
 
 has 'sth' => (
     is       => 'ro',
@@ -68,14 +68,7 @@ sub next {
 
     my $ref;
 
-    #    try {
     $ref = $self->sth->fetchrow_hashref;
-
-    #    } catch {
-    #        croak $self->db->query_as_string($self->query,
-    #            @{ $self->query->_bvalues } )
-    #            . "DBI:fetchrow_hashref: $_";
-    #    };
 
     if ( !$ref ) {
         $self->done(1);
@@ -94,14 +87,7 @@ sub all {
     while ( !$self->done ) {
         my $ref;
 
-        #        try {
         $ref = $self->sth->fetchrow_hashref;
-
-        #        } catch {
-        #            croak $self->db->query_as_string($self->query,
-        #                @{ $self->query->_bvalues } ) ;
-        #                . "DBI:fetchrow_hashref: $_";
-        #        };
 
         if ( !$ref ) {
             $self->done(1);
@@ -223,7 +209,7 @@ Mark Lawrence E<lt>nomad@null.netE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2007,2008 Mark Lawrence <nomad@null.net>
+Copyright (C) 2007-2011 Mark Lawrence <nomad@null.net>
 
 This program is free software; you can redistribute it and/or modify it
 under the terms of the GNU General Public License as published by the
