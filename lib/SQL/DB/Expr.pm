@@ -37,7 +37,7 @@ use overload
   fallback => 1,
   ;
 
-our $VERSION = '0.19_7';
+our $VERSION = '0.97_1';
 
 has '_txt' => (
     is       => 'rw',

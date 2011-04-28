@@ -7,6 +7,7 @@ use DBIx::Connector;
 use SQL::DB::Expr qw/:all/;
 use SQL::DB::Cursor;
 use Sub::Install qw/install_sub/;
+use Log::Any qw/$log/;
 
 use constant SQL_FUNCTIONS => qw/
   table
@@ -36,25 +37,33 @@ use constant SQL_FUNCTIONS => qw/
 use Sub::Exporter -setup => {
     exports => [SQL_FUNCTIONS],
     groups  => {
-
-        #        default => [qw/ /],
         all     => [SQL_FUNCTIONS],
         default => [SQL_FUNCTIONS],
     },
 };
 
-our $VERSION = '0.19_7';
+our $VERSION = '0.97_1';
 
 has 'debug'   => ( is => 'rw' );
 has 'dry_run' => ( is => 'rw' );
-
-has 'dsn' => ( is => 'rw', required => 1 );
+has 'dsn'     => (
+    is       => 'rw',
+    required => 1,
+    isa      => sub {
+        die "dsn must be 'dbi:...'" unless ( $_[0] =~ /^dbi:/ );
+    },
+    trigger => sub {
+        my $self = shift;
+        ( my $dsn = shift ) =~ /^dbi:(.*?):/;
+        my $dbd = $1 || die "Invalid DSN: " . $dsn;
+        $self->dbd($dbd);
+    },
+);
 has 'dbd' => ( is => 'rw', init_arg => undef );
 has 'dbuser'  => ( is => 'rw' );
 has 'dbpass'  => ( is => 'rw' );
 has 'dbattrs' => ( is => 'rw', default => sub { {} } );
 has 'conn' => ( is => 'rw', init_arg => undef );
-
 has 'prepare_mode' => (
     is  => 'rw',
     isa => sub {
@@ -63,16 +72,13 @@ has 'prepare_mode' => (
     },
     default => sub { 'prepare_cached' },
 );
-
 has '_current_timestamp' => ( is => 'rw', init_arg => undef );
 has '_sqlite_seq_dbh'    => ( is => 'rw', init_arg => undef );
 
 sub BUILD {
     my $self = shift;
-
-    ( my $dsn = $self->dsn ) =~ /^dbi:(.*?):/;
-    my $dbd = $1 || die "Invalid DSN: " . $self->dsn;
-    $self->dbd($dbd);
+    $self->dsn( $self->dsn );    # to make the trigger fire
+    my $dbd = $self->dbd;
 
     $self->dbattrs(
         {
@@ -102,7 +108,7 @@ sub BUILD {
 
     $self->conn(
         DBIx::Connector->new(
-            $dsn, $self->dbuser, $self->dbpass, $self->dbattrs
+            $self->dsn, $self->dbuser, $self->dbpass, $self->dbattrs
         )
     );
 
@@ -146,8 +152,7 @@ sub sth {
         confess "Bad Query: $@";
     }
 
-    warn $self->query_as_string( "$query", @{ $query->_bvalues } ) . "\n"
-      if $self->debug;
+    $log->debug( $self->query_as_string( "$query", @{ $query->_bvalues } ) );
 
     return if $self->dry_run;
 
@@ -158,7 +163,7 @@ sub sth {
             my $dbh = $_;
             my $sth = eval { $dbh->$prepare("$query") };
             if ($@) {
-                die $@ if ( $self->debug );
+                $log->error($@);
                 die $self->query_as_string( "$query", @{ $query->_bvalues } )
                   . "\n$@";
             }
@@ -169,15 +174,15 @@ sub sth {
                 next unless $ref;
                 my $type = $ref->{ $self->dbd } || $ref->{default};
                 $sth->bind_param( $i, undef, eval "$type" );
-                warn 'binding param ' . $i . ' with ' . $type
-                  if ( $self->debug && $self->debug > 1 );
+                $log->debug( 'binding param', $i, 'with', $type )
+                  if $self->debug > 1;
             }
             my $rv = $sth->execute( @{ $query->_bvalues } );
-            warn "-- Result: $rv" if ( $self->debug );
+            $log->debug( "-- Result:", $rv );
             return $wantarray ? ( $sth, $rv ) : $sth;
         },
         catch => sub {
-            die $_ if ( $self->debug );
+            $log->error($_) if ( $self->debug );
             die $self->query_as_string( "$query", @{ $query->_bvalues } )
               . "\n$_";
         }
@@ -211,15 +216,9 @@ sub do {
 }
 
 sub cursor {
-    my $self  = shift;
-    my $query = query(@_);
-    my $sth   = $self->sth($query);
-
-    return SQL::DB::Cursor->new(
-        db    => $self,
-        query => $query,
-        sth   => $sth,
-    );
+    my $self = shift;
+    my ( $sth, $rv ) = $self->sth(@_);
+    return SQL::DB::Cursor->new( sth => $sth );
 }
 
 sub fetch {
@@ -269,17 +268,18 @@ sub nextval {
     return if $self->dry_run;
 
     if ( $self->dbd eq 'SQLite' ) {
-        warn 'INSERT INTO sequence_' 
-          . $name
-          . "(mtime) VALUES(CURRENT_TIMESTAMP)\n"
-          if $self->debug;
+        $log->debug( 'INSERT INTO sequence_' 
+              . $name
+              . "(mtime) VALUES(CURRENT_TIMESTAMP)" );
+
         $self->_sqlite_seq_dbh->do( 'INSERT INTO sequence_' 
               . $name
               . '(mtime) VALUES(CURRENT_TIMESTAMP)' );
+
         return $self->_sqlite_seq_dbh->sqlite_last_insert_rowid();
     }
     elsif ( $self->dbd eq 'Pg' ) {
-        warn "SELECT nextval('seq_" . $name . "')\n" if $self->debug;
+        $log->debug( "SELECT nextval('seq_" . $name . "')" );
         my $val = $self->conn->run(
             sub {
                 $_->selectrow_array( "SELECT nextval('seq_" . $name . "')" );
@@ -333,7 +333,7 @@ sub query_as_string {
 #     values => {cid => 1, name => 'Mark'}
 # );
 sub insert_into {
-    my $self = shift;
+    my $self  = shift;
     my $table = shift;
     shift;
     my $values = shift;
@@ -341,15 +341,15 @@ sub insert_into {
     my $urow = urow($table);
 
     my @cols = sort grep { $urow->can($_) } keys %$values;
-    my @vals = map { $values->{$_} } @cols;
+    my @vals = map       { $values->{$_} } @cols;
 
     @cols || croak 'insert_into requires columns/values';
 
     return $self->do(
         insert_into => SQL::DB::Expr->new(
-            _txt => $table .'('. join(',',@cols) .')',
+            _txt => $table . '(' . join( ',', @cols ) . ')',
         ),
-        sql_values( @vals )
+        sql_values(@vals)
     );
 }
 
@@ -358,7 +358,7 @@ sub insert_into {
 #     where => {cid => 1},
 # );
 sub update {
-    my $self = shift;
+    my $self  = shift;
     my $table = shift;
     shift;
     my $set = shift;
@@ -366,29 +366,41 @@ sub update {
     my $where = shift;
 
     if ( $self->debug ) {
-        use Data::Dumper; $Data::Dumper::Indent = 1;
-        $Data::Dumper::Maxdepth=2;
-        warn Dumper( {table => $table, set => $set, where => $where});
+        require Data::Dumper;
+        local $Data::Dumper::Indent   = 1;
+        local $Data::Dumper::Maxdepth = 2;
+
+        $log->debug(
+            Dumper(
+                {
+                    table => $table,
+                    set   => $set,
+                    where => $where
+                }
+            )
+        );
     }
 
     my $urow = urow($table);
     my @updates = map { $urow->$_( $set->{$_} ) }
-        grep { $urow->can($_) and !exists $where->{$_} } keys %$set;
+      grep { $urow->can($_) and !exists $where->{$_} } keys %$set;
 
     unless (@updates) {
-        warn "Nothing to update for table: $table\n" if $self->debug;
+        $log->debug( "Nothing to update for table:", $table );
         return;
     }
 
-    my $expr = _expr_join(' AND ',
-        map { $urow->$_ == $where->{$_} }
-        grep { $urow->can($_) } keys %$where );
+    my $expr = _expr_join(
+        ' AND ',
+        map    { $urow->$_ == $where->{$_} }
+          grep { $urow->can($_) } keys %$where
+    );
 
     $expr || croak 'update requires a valid where clause';
     return $self->do(
         update => $urow,
-        set => \@updates,
-        where => $expr,
+        set    => \@updates,
+        where  => $expr,
     );
 }
 
@@ -397,19 +409,19 @@ sub update {
 # );
 
 sub delete_from {
-    my $self = shift;
+    my $self  = shift;
     my $table = shift;
     shift;
     my $where = shift;
 
     my $urow = urow($table);
-    my $expr = _expr_join(' AND ',
-        map { $urow->$_ == $where->{$_} } keys %$where );
+    my $expr =
+      _expr_join( ' AND ', map { $urow->$_ == $where->{$_} } keys %$where );
 
     $expr || croak 'delete_from requires a where clause';
     return $self->do(
         delete_from => $urow,
-        where => $expr,
+        where       => $expr,
     );
 }
 
@@ -430,68 +442,114 @@ sub select {
 
     @columns || croak 'select requires columns';
 
-    my $expr = _expr_join(' AND ',
-        map { $srow->$_ == $where->{$_} } keys %$where );
+    my $expr =
+      _expr_join( ' AND ', map { $srow->$_ == $where->{$_} } keys %$where );
 
     return $self->fetch(
         select => \@columns,
-        from => $srow,
-        $expr ? (where => $expr) : (),
+        from   => $srow,
+        $expr ? ( where => $expr ) : (),
     ) if wantarray;
 
     return $self->fetch1(
         select => \@columns,
-        from => $srow,
-        $expr ? (where => $expr) : (),
+        from   => $srow,
+        $expr ? ( where => $expr ) : (),
     );
+}
+
+sub last_deploy_id {
+    my $self = shift;
+    my $app = shift || croak 'deploy_id($app)';
+
+    return eval {
+        $self->conn->dbh->selectrow_array(
+            'SELECT count(id) FROM _sqldb WHERE app=?',
+            undef, $app );
+    } || 0;
 }
 
 sub deploy {
     my $self = shift;
-    my $ref  = shift;
+    my $app  = shift || croak 'deploy($app,$ref)';
+    my $ref  = shift || croak 'deploy($app,$ref)';
+
+    unless ( ref $ref ) {
+        eval { require YAML };
+        die "Deploy YAML feature not enabled" if $@;
+        if ( $ref =~ /^---/ ) {
+            $ref = YAML::Load($ref);
+        }
+        else {
+            $ref = YAML::LoadFile($ref);
+        }
+    }
+
+    if ( !grep { $_ eq $self->dbd } keys %$ref ) {
+        die "Missing key for deploy: "
+          . $self->dbd
+          . ' (have '
+          . join( ',', keys %$ref ) . ')';
+    }
 
     return $self->conn->txn(
         sub {
             my $dbh = $_;
 
-            $dbh->do( '
-            CREATE TABLE IF NOT EXISTS _sqldb (
-                id INTEGER PRIMARY KEY,
-                sql VARCHAR,
-                perl VARCHAR
-            )
-        ' );
+            my $sth = $dbh->table_info( '%', '%', '_sqldb' );
+            my $_sqldb = $dbh->selectall_arrayref($sth);
 
-            my $latest_change_id = $self->conn->dbh->selectrow_array(
-                'SELECT count(sql) FROM _sqldb');
-
-            my $count = 1;
-            foreach my $cmd (@$ref) {
-                next unless ( $count > $latest_change_id );
-
-                if ( defined $cmd->[0] ) {
-                    $dbh->do($cmd);
-                }
-                elsif ( defined $cmd->[1] ) {
-                    my $str = $cmd->[1];
-                    eval $str;
-                }
-                else {
-                    die "Require SQL or Perl";
-                }
-                $dbh->do( 'INSERT INTO _sqldb(sql) VALUES(?,?,?)',
-                    undef, $count, @$cmd );
-
-                $count++;
+            unless (@$_sqldb) {
+                $log->debug('Creating _sqldb');
+                $dbh->do( '
+                CREATE TABLE _sqldb (
+                    id INTEGER PRIMARY KEY,
+                    app VARCHAR(40) NOT NULL,
+                    ctime TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    type VARCHAR(20),
+                    data VARCHAR
+                )' );
             }
 
+            my $latest_change_id = $self->last_deploy_id($app);
+            $log->debug( 'Latest Change ID:', $latest_change_id );
+
+            my $count = 0;
+            foreach my $cmd ( @{ $ref->{ $self->dbd } } ) {
+                $count++;
+                next unless ( $count > $latest_change_id );
+
+                exists $cmd->{sql}
+                  || exists $cmd->{perl}
+                  || die "Missing 'sql' or 'perl' key for id " . $count;
+
+                if ( exists $cmd->{sql} ) {
+                    $log->debug( $cmd->{sql} );
+                    $dbh->do( $cmd->{sql} );
+                    $dbh->do(
+                        'INSERT INTO _sqldb(id,app,type,data) VALUES(?,?,?,?)',
+                        undef, $count, $app, 'sql', $cmd->{sql}
+                    );
+                }
+
+                if ( exists $cmd->{perl} ) {
+                    warn $cmd->{perl} if $self->debug;
+                    eval "$cmd->{perl}";
+                    die $@ if $@;
+                    $dbh->do(
+                        'INSERT INTO _sqldb(id,app,type,data) VALUES(?,?,?,?)',
+                        undef, $count, $app, 'perl', $cmd->{perl}
+                    );
+                }
+            }
+            $log->debug( 'Deployed to Change ID:', $count );
+            return $count;
         },
         catch => sub {
             die $_;
         }
     );
 }
-
 
 ### CLASS FUNCTIONS ###
 
@@ -636,9 +694,7 @@ sub urow {
 
     my @ret;
     foreach my $name (@_) {
-        my $urow = SQL::DB::Expr->new(
-            _txt   => $name,
-        );
+        my $urow = SQL::DB::Expr->new( _txt => $name, );
         bless $urow, __PACKAGE__ . '::Urow::' . $name;
         return $urow unless (wantarray);
         push( @ret, $urow );
@@ -650,18 +706,18 @@ sub query {
     return $_[0] if ( @_ == 1 and ref $_[0] eq 'SQL::DB::Expr' );
     my @statements;
     foreach my $item (@_) {
-        if ( ref $item eq '' ) {
-            ( my $tmp = $item ) =~ s/_/ /g;
-            push( @statements, uc $tmp . "\n" );
+        if ( eval { $item->isa('SQL::DB::Expr') } ) {
+            push( @statements, '    ', $item, "\n" );
         }
         elsif ( ref $item eq 'ARRAY' ) {
             push( @statements, '    ', _bexpr_join( ",\n    ", @$item ), "\n" );
-
-         #FIXME
-         #            push(@statements, '    ', query(",\n    ", @$item), "\n");
         }
-        elsif ( $item->isa('SQL::DB::Expr') ) {
-            push( @statements, '    ', $item, "\n" );
+        elsif ( ref $item ) {
+            confess "Invalid query element: " . $item;
+        }
+        else {    # ( ref $item eq '' ) {
+            ( my $tmp = uc($item) ) =~ s/_/ /g;
+            push( @statements, $tmp . "\n" );
         }
     }
 
@@ -724,14 +780,15 @@ SQL::DB - Perl/SQL database interface
 
 =head1 VERSION
 
-0.19_7. Development release.
+0.97_1. Development release.
 
 =head1 SYNOPSIS
 
     use SQL::DB;
+
     my $db = SQL::DB->connect( $dsn, $dbuser, $dbpass );
 
-    ### Basic Operations - thin wrappers around the main API
+    ### Convenience Methods - thin wrappers around the main API
 
     $db->insert_into('purchases',
         values => {id => 1, count => 1},
@@ -752,68 +809,58 @@ SQL::DB - Perl/SQL database interface
         where => {id => 1},
     );
 
-    ### Advanced Operation - make the database do some real work
+    ### The Main API
 
-    # It is faster if we don't have to retrieve
-    # this information from the DB
-    table 'customers' => qw/ cid name surname age /;
-    table 'products'  => qw/ pid label category /;
-    table 'purchases' => qw/ pid cid /;
+    table 'people' => qw/ id name dob salary /;
+    table 'purchases' => qw/ pid id /;
 
-    # Works for both Pg and SQLite
+    my $people = urow('people');
+
+    # * 2 calculation takes place inside the database:
+    $db->do(
+        update => $people,
+        set    => $people->salary( $people->salary * 2 ),
+        where  => $people->dob == $today,
+    );
+
+    my $purchases = srow('purchases');
+
+    my $row = $db->fetch1(
+        select    => [ $people->name, $ps->pid ],
+        from      => $people,
+        left_join => $purchases,
+        on        => $purchases->id == $people->id,
+        where     => $people->id->in(1,2,3) .AND.
+                       $people->name->like('%paul%'),
+        limit  => 1,
+        offset => 1,
+    );
+    # then do stuff with $row->pid, $row->name etc
+
+    my @rows = $db->fetch(
+        select => [ sql_coalesce($p->pid, $p->cid)->as('pcid') ],
+        from   => $p,
+        where  => $p->cid->is_not_null,
+    );
+    # coalesce column is available as $row->pcid
+
+    my $cursor = $db->cursor( @query ...);
+    while (my $row = $cursor->next) {
+        print $row->column(), $row->some_other_column;
+    }
+
+    # Emulated sequences on SQLite
     $db->create_sequence('purchases');
     my $id = $db->nextval('purchases');
 
+    # If you want the data your own way you can still use the query
+    # syntax:
+    my $sth = $db->sth( @query);
+    map { print join(',',@$_) ."\n" } $sth->fetchall_arrayref;
+
+    # Transactions provided by DBIx::Connector
     $db->txn( sub {
-
-        my $purchases = srow('purchases');
-        my $purchases2 = srow('purchases');
-
-
-        $db->do(
-            insert_into => sql_purchases('id','name'),
-            select   => [ $id, $purchases->name ],
-            from     => $purchases,
-            where    => $purchases->id->in(
-                select   => [ $purchases2->id ],
-                from     => $purchases2,
-                where    => ($purchases2->id != 1) .OR. (1),
-            ),
-            order_by => $purchases->name->desc,
-            offset => 20,
-            limit  => 5,
-        );
-
-        # Give everyone a birthday - calculated in the DB
-        my $people = urow('people');
-        $db->do(
-            update => $people,
-            set    => $people->age( $people->age + 1 ),
-            where  => $people->dob == $today,
-        );
-
-        $db->do(
-            delete_from => $people,
-            where       => ($people->id > 1) .AND. ($people->name != 'Markb'),
-        );
-
-        $people = srow('people');
-
-        my @people = $db->fetch1(
-            select => [
-                $people->id,
-                $people->name,
-            ],
-            from => $people,
-            where => $people->name->like('Mark%'),
-        )
-
-        # If you just want plain rows you can obtain the DBI
-        # statement handle:
-        my $sth = $db->sth( @query);
-        map { print join(',',@$_) ."\n" } $sth->fetchall_arrayref;
-
-
+        # multiple statements
     }, catch => sub {
         die "WTF: $_";
     });
@@ -821,11 +868,11 @@ SQL::DB - Perl/SQL database interface
 
 =head1 DESCRIPTION
 
-B<SQL::DB> is a Perl-to-SQL interface. By providing an interface that
-is very close to real SQL, B<SQL::DB> give you unfettered access to the
-power and flexibility of the underlying database. It aims to be a tool
-for programmers who want their databases to work just as hard as their
-Perl scripts.
+B<SQL::DB> is a Perl-to-SQL-database interface. By providing an
+interface that is very close to real SQL, B<SQL::DB> give you
+unfettered access to the power and flexibility of the underlying
+database. It aims to be a tool for programmers who want their databases
+to work just as hard as their Perl scripts.
 
 B<SQL::DB> is capable of generating just about any kind of query,
 including aggregate expressions, joins, nested selects, unions,
@@ -837,9 +884,12 @@ Although rows can be retrieved from the database as simple objects,
 B<SQL::DB> does not attempt to be an Object-Relational-Mapper al-la
 L<DBIx::Class>.
 
-there is This is nothing like a full-blown Object-Relational-Mapper (ORM) such
-as L<DBIx::Class>in the The effort needed to use B<SQL::DB> is primarily related to learning
-the query syntax, which is quite similar to SQL.
+there is This is nothing like a full-blown Object-Relational-Mapper
+(ORM) such as L<DBIx::Class>in the The effort needed to use B<SQL::DB>
+is primarily related to learning the query syntax, which is quite
+similar to SQL.
+
+B<SQL::DB> uses the L<Moo> object system internally.
 
 =head2 Abstract Rows and Expressions
 
@@ -939,16 +989,17 @@ on the PostgreSQL api.
 
 =over 4
 
+=item connect($dsn, [ $dbuser, $dbpass, $dbattrs ])
+
+This method is a convenience wrapper around new() for those who prefer
+L<DBI>-style construction.
+
 =item new( dsn => $dsn, ...)
 
 The new() constructor requires at least a 'dsn' option, and most likely
 you also want the 'dbuser' and 'dbpass' options as well. Also accepted
 are 'dbattrs', 'debug', 'dry_run' and 'prepare_mode'. See ATTRIBUTES
 below for the definitions.
-
-=item connect($dsn,$dbuser,$dbpass,$dbattrs)
-
-Similar to the L<DBI> connect() constructor.
 
 =back
 
@@ -1134,11 +1185,15 @@ Unimplemented.
 
 Unimplemented.
 
-=item deploy( $array_ref )
+=item deploy( $app, $array_ref )
 
-Deploy the [SQL,Perl] pairs contained in $array_ref to the database.
-Only $array_ref elements greater than the previous deployment count
-(stored in the _sqldb table) will be deployed.
+Deploy the [ $type, $data ] pairs contained in $array_ref to the
+database.  Only $array_ref elements greater than the previous
+deployment count (stored in the _sqldb table) will be deployed.
+
+=item last_deploy_id( $app )
+
+Returns the count of all deployments.
 
 =back
 
@@ -1211,18 +1266,16 @@ ARRAYREF elements are joined together with ','.
 
 All SQL::DB releases have so far been DEVELOPMENT!
 
-Version 0.19 was a complete rewrite based on Moo. Lots of things were
-simplified, modules deleted, dependencies removed, etc. The API has
-changed completely.
-
-Version 0.13 changed the return type of the txn() method. Instead of a
-2 value list indicating success/failure and error message, a single
-L<Return::Value> object is returned intead.
+B<SQL::DB> jumped from version 0.18 to 0.98 due to a complete rewrite
+based on Moo. Lots of things were simplified, modules deleted,
+dependencies removed, etc. The API changed enough to almost give this
+distribution a new name, except I don't know of anyone using this apart
+from myself. 0.98 will be the last release marked as development, 0.99
+will be a release candidate, and 1.00 will be the first stable release.
 
 =head1 SEE ALSO
 
-L<DBIx::Connector>, L<SQL::DB::Expr>, L<SQL::DB::Cursor>,
-L<SQL::DB::Schema>
+L<DBIx::Connector>, L<SQL::DB::Expr>, L<SQL::DB::Cursor>
 
 =head1 SUPPORT
 

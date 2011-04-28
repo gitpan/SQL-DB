@@ -3,113 +3,90 @@ use Moo;
 use Sub::Install qw/install_sub/;
 use Carp qw(croak);
 
-our $VERSION = '0.19_7';
+our $VERSION = '0.97_1';
 
 has 'sth' => (
     is       => 'ro',
     required => 1,
 );
 
-has 'db' => (
-    is       => 'ro',
-    required => 1,
-    weak_ref => 1,
-);
-
-has 'query' => (
-    is       => 'ro',
-    required => 1,
-);
-
 has 'class' => (
     is       => 'rw',
+    writer   => '_class',
     init_arg => undef,
 );
 
-has 'first' => (
-    is       => 'rw',
-    init_arg => undef,
-);
-
-has 'done' => (
+# '_done' is a bool set to true when there are no more rows to
+# be returned.
+has '_done' => (
     is       => 'rw',
     init_arg => undef,
 );
 
 my %classes;
 
-sub _make_class {
-    my $ref   = shift;
-    my @cols  = sort keys %$ref;
+sub BUILD {
+    my $self = shift;
+    return if $self->class;
+
+    my @cols = map { $_ =~ s/\s+/_/g; $_ } @{ $self->sth->{NAME_lc} };
     my $class = 'SQL::DB::Row::' . join( '_', @cols );
-    return $class if ( $classes{$class} );
 
-    foreach my $col (@cols) {
-        install_sub(
-            {
-                code => sub {
-                    return $_[0]->{$col} if @_ == 1;
-                    my $caller = caller;
-                    croak "'$caller' cannot alter the value of '$col' "
-                      . "on objects of class '$class'";
-                },
-                into => $class,
-                as   => $col,
-            }
-        );
+    if ( !$classes{$class} ) {
+        my $i = 0;
+        my $x = eval $i;
+        foreach my $col (@cols) {
+            my $x = eval $i;
+            install_sub(
+                {
+                    code => sub {
+                        $_[0]->[$x] = $_[2] if @_ == 2;
+                        return $_[0]->[$x];
+                    },
+                    into => $class,
+                    as   => $col,
+                }
+            );
+            $i++;
+        }
+        $classes{$class} = 1;
     }
-
-    return $classes{$class} = $class;
+    $self->class($class);
 }
 
 sub next {
     my $self = shift;
-    return if ( $self->done );
+    return if ( $self->_done );
 
-    my $ref;
+    my @values = $self->sth->fetchrow_array;
 
-    $ref = $self->sth->fetchrow_hashref;
-
-    if ( !$ref ) {
-        $self->done(1);
+    if ( !@values ) {
+        $self->finish;
         return;
     }
-    if ( !$self->class ) {
-        $self->class( _make_class($ref) );
-    }
-    return bless \%{$ref}, $self->class;
+    return bless \@values, $self->class;
 }
 
 sub all {
     my $self = shift;
-
     my @all;
-    while ( !$self->done ) {
-        my $ref;
-
-        $ref = $self->sth->fetchrow_hashref;
-
-        if ( !$ref ) {
-            $self->done(1);
-            last;
-        }
-        if ( !$self->class ) {
-            $self->class( _make_class($ref) );
-        }
-        push( @all, bless \%{$ref}, $self->class );
+    while ( my @values = $self->sth->fetchrow_array ) {
+        push( @all, bless \@values, $self->class );
     }
+    $self->finish;
     return @all;
 }
 
 sub finish {
     my $self = shift;
+    return if $self->_done;
     $self->sth->finish;
-    $self->done(1);
+    $self->_done(1);
 }
 
 sub DESTROY {
     my $self = shift;
-    $self->sth->finish;
+    $self->finish;
 }
 
 1;
@@ -123,34 +100,36 @@ SQL::DB::Cursor - SQL::DB database cursor
 =head1 SYNOPSIS
 
   use SQL::DB::Cursor;
+
   my $cursor = SQL::DB::Cursor->new(
-    sth => $sth,
-    db  => $sqldb,
-    query => $expr,
+      sth => $sth,
   );
 
-  while (my $next = $cursor->next) {
-    print $next->column()
+  while (my $row = $cursor->next) {
+      print $row->column(), $row->some_other_column;
   }
 
-  # Or if you want you can get all at once:
-  my @objects = $cursor->all;
+  # Or if you want you can get everything at once:
+  my @rows = $cursor->all;
 
 =head1 DESCRIPTION
 
-B<SQL::DB::Cursor> is a Perl-side cursor/read-only ORM interface to
-DBI. It is used by L<SQL::DB> to create objects from rows. See the
-SQL::DB "fetch()" method for details.
+B<SQL::DB::Cursor> is a class for traversing over records retrieved
+from a L<DBI> statement handle. Note that this is a Perl-side cursor,
+completely unrelated to any database-side cursors you might have.
+
+The objects returned by the 'next' and 'all' methods are simple
+ARRAY(ref) based objects with one accessor/modifer method per column.
+Method names are column names but with any spaces replaced by a '_'.
 
 =head1 CONSTRUCTOR
 
 =over 4
 
-=item new(sth => $sth, db => $db, query => $expr)
+=item new(sth => $sth)
 
-Create a new cursor object. $sth is a DBI statement handle (ie the
-result of a DBI->execute call). $db is the SQL::DB object creating the
-cursor. $expr must be the SQL::DB::Expr which was used to create $sth.
+Returns a new cursor object. $sth must be a L<DBI> statement handle
+that has already been 'executed'.
 
 =back
 
@@ -158,27 +137,15 @@ cursor. $expr must be the SQL::DB::Expr which was used to create $sth.
 
 =over 4
 
-=item sth
+=item sth -> DBI::st
 
-The DBI statement handle.
+The L<DBI> statement handle. Read-only.
 
-=item db
+=item class -> Str
 
-The SQL::DB object that created the statement handle and query.
-
-=item query
-
-The SQL::DB::Expr used to create the statement handle.
-
-=item class
-
-The class into which retrieved objects are blessed into. This is
-automatically created from the first row retrieved.
-
-=item done
-
-Boolean value that is set to true when there are no more rows to be
-returned.
+The class name into which retrieved rows are 'blessed'. This is
+automatically calculated based on the retrieved column names.
+Read-only.
 
 =back
 
@@ -186,22 +153,32 @@ returned.
 
 =over 4
 
-=item next
+=item BUILD
+
+Internal method.
+
+=item next -> $row
 
 Returns the next row from the statement handle as an object. Returns
-undef when no data is left. Croaks on failure.
+undef when there is no more data.
 
-=item all
+=item all -> @rows
 
-Returns all rows from the statement handle as a list of objects.
-Returns the empty list if no data is available (or has already been
-fetch with 'next' for example). Croaks on failure.
+Returns all remaining rows from the statement handle as a list of
+objects. Returns the empty list if no data is available.
 
 =item finish
 
-Calls finish() on the DBI statement handle.
+Calls finish() on the DBI statement handle and internally records that
+there is no more data to be retrieved. This method is automatically
+called when the cursor object goes out of scope, so be aware you cannot
+use the passed-in statement handle again.
 
 =back
+
+=head1 SEE ALSO
+
+L<DBI>, L<SQL::DB>
 
 =head1 AUTHOR
 

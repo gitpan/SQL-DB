@@ -1,12 +1,14 @@
 use strict;
 use warnings;
-use Test::More tests => 2;
+use Test::More tests => 1;
+use SQL::DB::Cursor;
 
-use_ok('SQL::DB::Cursor');
-can_ok('SQL::DB::Cursor', qw/
-    new
-    next
-    all
-    finish
-/);
+can_ok(
+    'SQL::DB::Cursor', qw/
+      new
+      next
+      all
+      finish
+      /
+);
 
