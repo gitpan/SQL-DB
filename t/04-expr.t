@@ -1,6 +1,6 @@
 use strict;
 use warnings;
-use Test::More tests => 137;
+use Test::More;
 use Test::Differences qw/eq_or_diff/;
 use SQL::DB::Expr qw/AND OR _bexpr _expr_join _bexpr_join /;
 
@@ -32,10 +32,22 @@ my $ce4 = ( ( $e1 != 6 ) . OR . ( $e2 < 3 ) );
 my $alias = SQL::DB::Expr->new( _alias => 'alias', _txt => 'junk' );
 
 is( $e1->_as_string, 'e1', 'e1 is e1' );
-is $e1 . ' after', 'e1 after', 'after';
-is 'before ' . $e1, 'before e1', 'before';
-is $e1 . $e2, 'e1e2', 'e1e2';
-is $e2 . $e1, 'e2e1', 'e2e1';
+my $x;
+
+$x = $e1 . ' after';
+is $x->_as_string, 'e1 after', 'after';
+
+$x = $e1 . ' after';
+is $x->_as_string, 'e1 after', 'after';
+
+$x = 'before ' . $e1;
+is $x->_as_string, 'before e1', 'before';
+
+$x = $e1 . $e2;
+is $x->_as_string, 'e1e2', 'e1e2';
+
+$x = $e2 . $e1;
+is $x->_as_string, 'e2e1', 'e2e1';
 
 my $extra = ' extra ';
 

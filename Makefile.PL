@@ -17,7 +17,13 @@ build_requires 'Test::Database'    => 0;
 build_requires 'Test::Differences' => 0;
 build_requires 'DBD::SQLite'       => '1.26';
 
-feature 'DeployYAML',
+feature 'sqldb-schema',
+  -default       => 1,
+  'Term::Prompt' => 0,
+  'File::Slurp'  => 0,
+  'Perl::Tidy'   => 0;
+
+feature 'Deploy',
   -default => 0,
   'YAML'   => 0;
 

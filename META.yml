@@ -25,12 +25,15 @@ no_index:
     - xt
 requires:
   DBIx::Connector: 0
+  File::Slurp: 0
   Log::Any: 0
   Moo: 0
+  Perl::Tidy: 0
   Sub::Exporter: 0.04
   Sub::Install: 0.04
+  Term::Prompt: 0
   YAML: 0
 resources:
   license: http://opensource.org/licenses/gpl-license.php
   repository: http://github.com/mlawren/sql-db.git/
-version: 0.97_1
+version: 0.97_2
