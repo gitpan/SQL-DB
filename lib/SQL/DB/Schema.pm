@@ -13,7 +13,7 @@ use Sub::Exporter -setup => {
     },
 };
 
-our $VERSION = '0.97_2';
+our $VERSION = '0.97_3';
 my %schema;
 
 # Ordinals for DBI->column_info() results
@@ -41,7 +41,7 @@ use constant {
 # Object definition
 
 has 'name' => (
-    is       => 'ro',
+    is       => 'rw',
     required => 1,
 );
 
@@ -80,8 +80,11 @@ sub define {
 
         if ( !exists $tables->{$table} ) {
 
-            @{ *{ _getglob( $srow . '::ISA' ) }{ARRAY} } = ('SQL::DB::Expr');
-            @{ *{ _getglob( $urow . '::ISA' ) }{ARRAY} } = ('SQL::DB::Expr');
+            eval "package $srow; use Moo; extends 'SQL::DB::Expr'";
+            eval "package $urow; use Moo; extends 'SQL::DB::Expr'";
+
+  #            @{ *{ _getglob( $srow . '::ISA' ) }{ARRAY} } = ('SQL::DB::Expr');
+  #            @{ *{ _getglob( $urow . '::ISA' ) }{ARRAY} } = ('SQL::DB::Expr');
 
             install_sub(
                 {
