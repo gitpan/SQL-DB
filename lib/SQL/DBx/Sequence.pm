@@ -5,7 +5,7 @@ use Moo::Role;
 use Log::Any qw/$log/;
 use Carp qw/croak carp confess/;
 
-our $VERSION = '0.19_9';
+our $VERSION = '0.19_10';
 
 after BUILD => sub {
     my $self = shift;
@@ -30,6 +30,14 @@ sub create_sequence {
         $self->conn->dbh->do( 'CREATE TABLE seq.' 
               . $name . ' ('
               . 'seq INTEGER PRIMARY KEY, x INTEGER )' );
+
+        $self->conn->dbh->do( "
+            CREATE TRIGGER seq.ai_$name AFTER INSERT ON $name
+            BEGIN
+                DELETE FROM $name WHERE seq != NEW.seq;
+            END;"
+        );
+
     }
     elsif ( $self->dbd eq 'Pg' ) {
         $self->conn->run(
