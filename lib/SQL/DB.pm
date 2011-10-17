@@ -5,16 +5,17 @@ use Moo;
 use Log::Any qw/$log/;
 use Carp qw/croak carp confess/;
 use Storable qw/dclone/;
-use DBI ':sql_types';
+use DBI ':sql_types', 'looks_like_number';
 use DBIx::Connector;
-use SQL::DB::Schema qw/get_schema/;
+use SQL::DB::Schema qw/load_schema/;
 use SQL::DB::Expr qw/:all/;
 use SQL::DB::Iter;
 
 use constant SQL_FUNCTIONS => qw/
-  query
+  bv
   AND
   OR
+  query
   sql_and
   sql_case
   sql_cast
@@ -30,6 +31,7 @@ use constant SQL_FUNCTIONS => qw/
   sql_or
   sql_substr
   sql_sum
+  sql_table
   sql_upper
   sql_values
   /;
@@ -38,74 +40,65 @@ use Sub::Exporter -setup => {
     exports => [SQL_FUNCTIONS],
     groups  => {
         all     => [SQL_FUNCTIONS],
-        default => [SQL_FUNCTIONS],
+        default => [],
     },
 };
 
-our $VERSION = '0.97_3';
+our $VERSION = '0.19_8';
 
 ### CLASS FUNCTIONS ###
 
-sub query {
-    return $_[0] if ( @_ == 1 and ref $_[0] eq 'SQL::DB::Expr' );
-    my @statements;
-    foreach my $item (@_) {
-        if ( eval { $item->isa('SQL::DB::Expr') } ) {
-            push( @statements, '    ', $item, "\n" );
-        }
-        elsif ( ref $item eq 'ARRAY' ) {
-            push( @statements, '    ', _bexpr_join( ",\n    ", @$item ), "\n" );
-        }
-        elsif ( ref $item ) {
-            confess "Invalid query element: " . $item;
-        }
-        else {    # ( ref $item eq '' ) {
-            ( my $tmp = uc($item) ) =~ s/_/ /g;
-            push( @statements, $tmp . "\n" );
-        }
-    }
+sub bv { _bval(@_) }
 
-    my $e = _expr_join( '', @statements );
-    $e->_txt( $e->_txt . "\n" ) unless ( $e->_txt =~ /\n$/ );
-    return $e;
-}
+sub query { _query(@_) }
 
-sub sql_and { _bexpr_join( ' AND ', @_ ) }
+sub sql_and { _expr_join( ' AND ', @_ ) }
 
 sub sql_case {
     @_ || croak 'case([$expr,] when => $expr, then => $val,[else...])';
 
-    my @items = map {
-        ( ref $_ eq '' && $_ =~ m/^((when)|(then)|(else))$/i )
-          ? uc($_)
-          : _bexpr($_)
-    } @_;
+    my $e = SQL::DB::Expr->new( _txt => ["CASE\n"] );
 
-    return _expr_join( ' ', 'CASE', @items, 'END' );
+    while ( my ( $keyword, $item ) = splice( @_, 0, 2 ) ) {
+        $e .= '    ' . uc($keyword) . "\n        ";
+
+        # Need to do this separately because
+        # SQL::DB::Quote doesn't know how to '.='
+        $e .= _quote($item);
+        $e .= "\n";
+    }
+    $e .= '    END';
+    return $e;
 }
 
 sub sql_coalesce { sql_func( 'COALESCE', @_ ) }
 
-sub sql_cast { sql_func( 'CAST', @_ ) }
+sub sql_cast {
+    return _expr_join( ' ', 'CAST(', $_[0], 'AS', $_[2], ')' );
+}
 
 sub sql_concat { _expr_binary( '||', $_[0], $_[1] ) }
 
 sub sql_count {
     my $e = sql_func( 'COUNT', @_ );
-    $e->_btype( { default => SQL_INTEGER } );
+    $e->_btype('integer');
     return $e;
 }
 
-sub sql_exists { 'EXISTS(' . query(@_) . ')' }
+sub sql_exists { 'EXISTS(' . _query(@_) . ')' }
 
 sub sql_func {
     my $func = shift;
-    return $func . '(' . _bexpr_join( ', ', @_ ) . ')';
+    my $e = SQL::DB::Expr->new( _txt => [ $func . '(', ] );
+    $e .= _expr_join( ', ', map { _quote($_) } @_ ) . ')';
+    return $e;
 }
 
 sub sql_length { sql_func( 'LENGTH', @_ ) }
 
 sub sql_lower { sql_func( 'LOWER', @_ ) }
+
+sub sql_or { _expr_join( ' OR ', @_ ) }
 
 sub sql_max { sql_func( 'MAX', @_ ) }
 
@@ -115,232 +108,319 @@ sub sql_substr { sql_func( 'SUBSTR', @_ ) }
 
 sub sql_sum { sql_func( 'SUM', @_ ) }
 
-sub sql_or { _bexpr_join( ' OR ', @_ ) }
+sub sql_table {
+    my $table = shift;
+    return SQL::DB::Expr->new(
+        _txt => [ $table . '(' . join( ', ', @_ ) . ')' ] );
+}
 
 sub sql_upper { sql_func( 'UPPER', @_ ) }
 
 sub sql_values { sql_func( 'VALUES', @_ ) }
 
-# SQL::DB Object implementation
+### OBJECT IMPLEMENTATION ###
 
-has 'debug' => ( is => 'rw', default => sub { 0 } );
+has 'conn' => ( is => 'ro' );
 
-has 'dsn' => (
-    is       => 'rw',
-    required => 1,
-    isa      => sub {
-        confess "dsn must be 'dbi:...'"
-          unless ( defined $_[0] && $_[0] =~ /^dbi:/ );
-    },
-    trigger => sub {
-        my $self = shift;
-        ( my $dsn = shift ) =~ /^dbi:(.*?):/;
-        my $dbd = $1 || die "Invalid DSN: " . $dsn;
-        $self->dbd($dbd);
-    },
-);
+has 'dbd' => ( is => 'ro' );
 
-has 'dbd' => ( is => 'rw', init_arg => undef );
+has 'schema' => ( is => 'ro' );
 
-has 'dbuser' => ( is => 'rw' );
-
-has 'dbpass' => ( is => 'rw' );
-
-has 'dbattrs' => ( is => 'rw', default => sub { {} } );
-
-has 'conn' => ( is => 'rw', init_arg => undef );
-
-has 'schema' => (
+has 'cache_sth' => (
     is      => 'rw',
-    trigger => sub {
-        my $self = shift;
-        $self->_schema( get_schema( $self->schema )
-              || SQL::DB::Schema->new( name => $self->schema ) );
-    },
-);
-
-has '_schema' => (
-    is       => 'rw',
-    init_arg => undef,
-);
-
-has 'prepare_mode' => (
-    is  => 'rw',
-    isa => sub {
-        confess "prepare_mode must be 'prepare|prepare_cached'"
-          unless $_[0] =~ m/^(prepare)|(prepare_cached)$/;
-    },
-    default => sub { 'prepare_cached' },
+    default => sub { 1 },
 );
 
 has '_current_timestamp' => ( is => 'rw', init_arg => undef );
 
-sub BUILD {
-    my $self = shift;
-    $self->dsn( $self->dsn );    # to make the trigger fire
-    my $dbd = $self->dbd;
+around BUILDARGS => sub {
+    my $orig  = shift;
+    my $class = shift;
+    my %args  = @_;
 
-    # Trigger schema creation
-    $self->schema( $self->schema || $self->dsn );
+    $args{dsn} || confess 'Missing argument: dsn';
+    my ( $dbi, $dbd, @rest ) = DBI->parse_dsn( $args{dsn} );
 
-    $self->dbattrs(
-        {
-            PrintError => 0,
-            ChopBlanks => 1,
-            $dbd eq 'Pg'     ? ( pg_enable_utf8    => 1 ) : (),
-            $dbd eq 'SQLite' ? ( sqlite_unicode    => 1 ) : (),
-            $dbd eq 'mysql'  ? ( mysql_enable_utf8 => 1 ) : (),
-            %{ $self->dbattrs },
-            RaiseError => 1,
-            AutoCommit => 1,
-            Callbacks  => {
-                connected => sub {
-                    my $h = shift;
-                    if ( $dbd eq 'Pg' ) {
-                        $h->do('SET client_min_messages = WARNING;');
-                        $h->do("SET TIMEZONE TO 'UTC';");
-                    }
-                    elsif ( $dbd eq 'SQLite' ) {
-                        $h->do('PRAGMA foreign_keys = ON;');
-                    }
-                    return;
-                },
-            }
+    $args{dbd} = $dbd;
+
+    if ( my $sname = $args{schema} ) {
+        $sname .= '::' . $dbd;
+        $args{schema} = load_schema($sname);
+    }
+    else {
+        ( my $sname = "$args{dsn}" ) =~ s/[^a-zA-Z]/_/g;
+        $args{schema} = SQL::DB::Schema->new( name => $sname );
+    }
+
+    my $attr = {
+        PrintError => 0,
+        ChopBlanks => 1,
+        $dbd eq 'Pg'     ? ( pg_enable_utf8    => 1 ) : (),
+        $dbd eq 'SQLite' ? ( sqlite_unicode    => 1 ) : (),
+        $dbd eq 'mysql'  ? ( mysql_enable_utf8 => 1 ) : (),
+        %{ $args{attr} || {} },
+        RaiseError => 1,
+        AutoCommit => 1,
+        Callbacks  => {
+            connected => sub {
+                my $h = shift;
+                if ( $dbd eq 'Pg' ) {
+                    $h->do('SET client_min_messages = WARNING;');
+                    $h->do("SET TIMEZONE TO 'UTC';");
+                }
+                elsif ( $dbd eq 'SQLite' ) {
+                    $h->do('PRAGMA foreign_keys = ON;');
+                }
+                return;
+            },
         }
-    );
+    };
 
-    $self->conn(
-        DBIx::Connector->new(
-            $self->dsn, $self->dbuser, $self->dbpass, $self->dbattrs
-        )
-    );
+    $args{conn} =
+      DBIx::Connector->new( $args{dsn}, $args{username}, $args{password},
+        $attr );
 
-    $self->conn->mode('fixup');
-    return $self;
+    $log->debug( 'Connected to ' . $args{dsn} );
+    $args{conn}->mode('fixup');
+
+    return $class->$orig(%args);
+};
+
+# For our extensions to 'around' or 'after'
+sub BUILD {
 }
 
 sub connect {
-    my $class   = shift;
-    my $dsn     = shift;
-    my $dbuser  = shift;
-    my $dbpass  = shift;
-    my $dbattrs = shift || {};
+    my $class    = shift;
+    my $dsn      = shift;
+    my $username = shift;
+    my $password = shift;
+    my $attr     = shift || {};
+
     return $class->new(
-        dsn     => $dsn,
-        dbuser  => $dbuser,
-        dbpass  => $dbpass,
-        dbattrs => $dbattrs,
+        dsn      => $dsn,
+        username => $username,
+        password => $password,
+        attr     => $attr,
     );
 }
 
 sub _load_tables {
     my $self = shift;
 
+    my %seen;
     foreach my $table (@_) {
+        next if $seen{$table};
+        $log->debug( 'Loading table schema: ' . $table );
         my $sth = $self->conn->dbh->column_info( '%', '%', $table, '%' );
-        $self->_schema->define( $sth->fetchall_arrayref );
+        $self->schema->define( $sth->fetchall_arrayref );
+        $seen{$table}++;
     }
+}
+
+sub irow {
+    my $self = shift;
+
+    if ( my @unknown = $self->schema->not_known(@_) ) {
+        $self->_load_tables(@unknown);
+    }
+
+    return $self->schema->irow(@_);
 }
 
 sub urow {
     my $self = shift;
 
-    if ( my @unknown = $self->_schema->not_known(@_) ) {
+    if ( my @unknown = $self->schema->not_known(@_) ) {
         $self->_load_tables(@unknown);
     }
 
-    return $self->_schema->urow(@_);
+    return $self->schema->urow(@_);
 }
 
 sub srow {
     my $self = shift;
 
-    if ( my @unknown = $self->_schema->not_known(@_) ) {
+    if ( my @unknown = $self->schema->not_known(@_) ) {
         $self->_load_tables(@unknown);
     }
 
-    return $self->_schema->srow(@_);
+    return $self->schema->srow(@_);
 }
 
-sub sth {
+sub _prepare {
     my $self    = shift;
-    my $prepare = $self->prepare_mode;
-    my $query   = eval { query(@_) };
-
-    if ( !defined $query ) {
-        confess "Bad Query: $@";
-    }
-
-    $log->debug(
-        $self->query_as_string( $query->_as_string, @{ $query->_bvalues } ) );
-
-    #    $log->debugf( $query->_as_string, @{ $query->_bvalues } );
-
-    my $wantarray = wantarray;
+    my $prepare = shift;
+    my $query   = _query(@_);
 
     return $self->conn->run(
         sub {
             my $dbh = $_;
+
+            $log->debug( "/* $prepare */\n" . $query->_as_string );
+
+  #                $self->query_as_string( $query->_as_string, @bind_values ) );
+
+            my @bind_values;
+            my @bind_types;
+
+            my $ref = $query->_txt;
+            foreach my $i ( 0 .. $#{$ref} ) {
+                if ( ref $ref->[$i] eq 'SQL::DB::Quote' ) {
+                    if ( looks_like_number( $ref->[$i]->val ) ) {
+                        $ref->[$i] = $ref->[$i]->val;
+                    }
+                    else {
+                        $ref->[$i] = $dbh->quote( $ref->[$i]->val );
+                    }
+                }
+                elsif ( ref $ref->[$i] eq 'SQL::DB::BindValue' ) {
+                    my $val  = $ref->[$i]->val;
+                    my $type = $ref->[$i]->type;
+
+                    # TODO: Ignore everything except binary/bytea?
+                    if ( ref $type eq 'HASH' ) {
+
+                        # pass it straight through
+                    }
+                    elsif ( $type =~ /^bit/ ) {
+                        $type = { TYPE => SQL_BIT };
+                    }
+                    elsif ( $type =~ /^smallint/ ) {
+                        $type = { TYPE => SQL_SMALLINT };
+                    }
+                    elsif ( $type =~ /^numeric/ ) {
+                        $type = { TYPE => SQL_NUMERIC };
+                    }
+                    elsif ( $type =~ /^decimal/ ) {
+                        $type = { TYPE => SQL_DECIMAL };
+                    }
+                    elsif ( $type =~ /^int/ ) {
+                        $type = { TYPE => SQL_INTEGER };
+                    }
+                    elsif ( $type =~ /^bigint/ ) {
+                        $type = { TYPE => SQL_BIGINT };
+                    }
+                    elsif ( $type =~ /^float/ ) {
+                        push( @bind_types, { TYPE => SQL_FLOAT } );
+                    }
+                    elsif ( $type =~ /^real/ ) {
+                        push( @bind_types, { TYPE => SQL_REAL } );
+                    }
+                    elsif ( $type =~ /^double/ ) {
+                        push( @bind_types, { TYPE => SQL_DOUBLE } );
+                    }
+                    elsif ( $type =~ /^char/ ) {
+                        push( @bind_types, { TYPE => SQL_CHAR } );
+                    }
+                    elsif ( $type =~ /^varchar/ ) {
+                        push( @bind_types, { TYPE => SQL_VARCHAR } );
+                    }
+                    elsif ( $type =~ /^datetime/ ) {
+                        push( @bind_types, { TYPE => SQL_DATETIME } );
+                    }
+                    elsif ( $type =~ /^date/ ) {
+                        push( @bind_types, { TYPE => SQL_DATE } );
+                    }
+                    elsif ( $type =~ /^timestamp/ ) {
+                        push( @bind_types, { TYPE => SQL_TIMESTAMP } );
+                    }
+                    elsif ( $type =~ /^interval/ ) {
+                        push( @bind_types, { TYPE => SQL_INTERVAL } );
+                    }
+                    elsif ( $type =~ /^bin/ ) {
+                        $type = { TYPE => SQL_BINARY };
+                    }
+                    elsif ( $type =~ /^varbin/ ) {
+                        $type = { TYPE => SQL_VARBINARY };
+                    }
+                    elsif ( $type =~ /^blob/ ) {
+                        $type = { TYPE => SQL_BLOB };
+                    }
+                    elsif ( $type =~ /^clob/ ) {
+                        $type = { TYPE => SQL_CLOB };
+                    }
+                    elsif ( $type =~ /^bytea/ ) {
+                        $type = { pg_type => eval 'DBD::Pg::PG_BYTEA' };
+                    }
+                    elsif ( looks_like_number($val) ) {
+                        if ( $val =~ /\./ ) {
+                            $type = { TYPE => SQL_FLOAT };
+                        }
+                        else {
+                            $type = { TYPE => SQL_INTEGER };
+                        }
+                    }
+                    else {
+                        $type = { TYPE => SQL_VARCHAR };
+                    }
+
+                    push( @bind_values, $val );
+                    push( @bind_types,  $type );
+                    $ref->[$i] = '?';
+                }
+            }
+
             my $sth = eval { $dbh->$prepare( $query->_as_string ) };
             if ($@) {
-                die $self->query_as_string( $query->_as_string,
-                    @{ $query->_bvalues } )
+                die 'Error: '
+                  . $self->query_as_string( $query->_as_string, @bind_values )
                   . "\n$@";
             }
 
-            my $i     = 0;
-            my $types = dclone $query->_btypes;
-            foreach my $val ( @{ $query->_bvalues } ) {
+            my $i = 0;
+            foreach my $val (@bind_values) {
                 $i++;
-                my $type = shift @$types;
-                my $btype = eval { $type->{ $self->dbd } || $type->{default} };
-                $sth->bind_param( $i, $val, $btype );
-
-#                $log->debugf('binding param %s %s as type %s', $i, $val, $btype );
+                my $type = shift @bind_types;
+                $log->debugf( 'binding param %s as type %s', $i, $type );
+                $sth->bind_param( $i, $val, $type );
             }
 
-            {
-                no warnings 'uninitialized';
-
-                my $rv = $sth->execute;
-                $log->debug( "-- Result:", $rv );
-                return $wantarray ? ( $sth, $rv ) : $sth;
-            }
+            return $sth;
         },
     );
 }
 
-sub txn {
-    my $wantarray = wantarray;
+sub prepare {
+    my $self = shift;
+    return $self->_prepare( 'prepare', @_ );
+}
 
-    my $self          = shift;
-    my $set_timestamp = !$self->_current_timestamp;
+sub prepare_cached {
+    my $self = shift;
+    return $self->_prepare( 'prepare_cached', @_ );
+}
 
-    if ($set_timestamp) {
-        $log->debug('BEGIN TRANSACTION;');
-        $self->_current_timestamp( $self->current_timestamp );
-    }
-
-    my @ret = $self->conn->txn(@_);
-
-    if ($set_timestamp) {
-        $log->debug('COMMIT;');
-        $self->_current_timestamp(undef);
-    }
-
-    return $wantarray ? @ret : $ret[0];
+sub sth {
+    my $self = shift;
+    my $sth =
+        $self->cache_sth
+      ? $self->_prepare( 'prepare_cached', @_ )
+      : $self->_prepare( 'prepare',        @_ );
+    my $rv = $sth->execute();
+    return $sth;
 }
 
 sub do {
     my $self = shift;
-    my ( $sth, $rv ) = $self->sth(@_);
+    my $sth =
+        $self->cache_sth
+      ? $self->_prepare( 'prepare_cached', @_ )
+      : $self->_prepare( 'prepare',        @_ );
+    my $rv = $sth->execute();
+    $log->debug( "-- Result:", $rv );
     $sth->finish();
     return $rv;
 }
 
 sub iter {
     my $self = shift;
-    my ( $sth, $rv ) = $self->sth(@_);
+    my $sth =
+        $self->cache_sth
+      ? $self->_prepare( 'prepare_cached', @_ )
+      : $self->_prepare( 'prepare',        @_ );
+    my $rv = $sth->execute();
+    $log->debug( "-- Result:", $rv );
     return SQL::DB::Iter->new( sth => $sth );
 }
 
@@ -369,6 +449,27 @@ sub current_timestamp {
         $year, $mon, $mday, $hour, $min, $sec );
 }
 
+sub txn {
+    my $wantarray = wantarray;
+
+    my $self          = shift;
+    my $set_timestamp = !$self->_current_timestamp;
+
+    if ($set_timestamp) {
+        $log->debug('BEGIN TRANSACTION;');
+        $self->_current_timestamp( $self->current_timestamp );
+    }
+
+    my @ret = $self->conn->txn(@_);
+
+    if ($set_timestamp) {
+        $log->debug('COMMIT;');
+        $self->_current_timestamp(undef);
+    }
+
+    return $wantarray ? @ret : $ret[0];
+}
+
 sub query_as_string {
     my $self = shift;
     my $sql  = shift || confess 'usage: query_as_string($sql,@values)';
@@ -382,8 +483,13 @@ sub query_as_string {
         else {
             my $quote;
             if ( defined $x ) {
-                $x =~ s/\n.*/\.\.\./s;
-                $quote = $dbh->quote("$x");
+                if ( looks_like_number($x) ) {
+                    $quote = $x;
+                }
+                else {
+                    $x =~ s/\n.*/\.\.\./s;
+                    $quote = $dbh->quote("$x");
+                }
             }
             else {
                 $quote = $dbh->quote(undef);
@@ -392,135 +498,6 @@ sub query_as_string {
         }
     }
     return $sql . ';';
-}
-
-# $db->insert_into('customers',
-#     values => {cid => 1, name => 'Mark'}
-# );
-sub insert_into {
-    my $self  = shift;
-    my $table = shift;
-    shift;
-    my $values = shift;
-
-    my $urow = $self->urow($table);
-
-    my @cols = sort grep { $urow->can($_) } keys %$values;
-    my @vals = map       { $values->{$_} } @cols;
-
-    @cols || croak 'insert_into requires columns/values';
-
-    return $self->do(
-        insert_into => SQL::DB::Expr->new(
-            _txt => $table . '(' . join( ',', @cols ) . ')',
-        ),
-        sql_values(@vals)
-    );
-}
-
-# $db->update('purchases',
-#     set   => {pid => 2},
-#     where => {cid => 1},
-# );
-sub update {
-    my $self  = shift;
-    my $table = shift;
-    shift;
-    my $set = shift;
-    shift;
-    my $where = shift;
-
-    if ( $self->debug ) {
-        require Data::Dumper;
-        local $Data::Dumper::Indent   = 1;
-        local $Data::Dumper::Maxdepth = 2;
-
-        $log->debug(
-            Data::Dumper::Dumper(
-                {
-                    table => $table,
-                    set   => $set,
-                    where => $where
-                }
-            )
-        );
-    }
-
-    my $urow = $self->urow($table);
-    my @updates = map { $urow->$_( $set->{$_} ) }
-      grep { $urow->can($_) and !exists $where->{$_} } keys %$set;
-
-    unless (@updates) {
-        $log->debug( "Nothing to update for table:", $table );
-        return;
-    }
-
-    my $expr = _expr_join(
-        ' AND ',
-        map    { $urow->$_ == $where->{$_} }
-          grep { $urow->can($_) } keys %$where
-    );
-
-    $expr || croak 'update requires a valid where clause';
-    return $self->do(
-        update => $urow,
-        set    => \@updates,
-        where  => $expr,
-    );
-}
-
-# $db->delete_from('purchases',
-#    where => {cid => 1},
-# );
-
-sub delete_from {
-    my $self  = shift;
-    my $table = shift;
-    shift;
-    my $where = shift;
-
-    my $urow = $self->urow($table);
-    my $expr =
-      _expr_join( ' AND ', map { $urow->$_ == $where->{$_} } keys %$where );
-
-    $expr || croak 'delete_from requires a where clause';
-    return $self->do(
-        delete_from => $urow,
-        where       => $expr,
-    );
-}
-
-# my @objs = $db->select( ['pid','label],
-#     from => 'customers',
-#     where => {cid => 1},
-# );
-sub select {
-    my $self = shift;
-    my $list = shift;
-    shift;
-    my $table = shift;
-    shift;
-    my $where = shift;
-
-    my $srow = $self->_schema->srow($table);
-    my @columns = map { $srow->$_ } @$list;
-
-    @columns || croak 'select requires columns';
-
-    my $expr =
-      _expr_join( ' AND ', map { $srow->$_ == $where->{$_} } keys %$where );
-
-    return $self->fetch(
-        select => \@columns,
-        from   => $srow,
-        $expr ? ( where => $expr ) : (),
-    ) if wantarray;
-
-    return $self->fetch1(
-        select => \@columns,
-        from   => $srow,
-        $expr ? ( where => $expr ) : (),
-    );
 }
 
 1;

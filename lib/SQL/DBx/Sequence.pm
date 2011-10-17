@@ -1,33 +1,25 @@
-package SQL::DB::Sequence;
+package SQL::DBx::Sequence;
 use strict;
 use warnings;
 use Moo::Role;
 use Log::Any qw/$log/;
 use Carp qw/croak carp confess/;
 
-our $VERSION = '0.97_3';
+our $VERSION = '0.19_8';
 
-has '_sqlite_seq_dbh' => (
-    is       => 'rw',
-    init_arg => undef,
-);
-
-after 'BUILD' => sub {
+after BUILD => sub {
     my $self = shift;
+    return unless $self->dbd eq 'SQLite';
 
-    if ( $self->dbd eq 'SQLite' and $self->dsn !~ m/\.seq$/ ) {
-        my $dsn = $self->dsn . '.seq';
-        my $dbh = DBI->connect(
-            $dsn, '', '',
-            {
-                RaiseError => 1,
-                PrintError => 0,
-            }
-        );
-        $self->_sqlite_seq_dbh($dbh);
+    my $rows = $self->conn->dbh->selectall_arrayref('PRAGMA database_list');
+
+    foreach my $row (@$rows) {
+        if ( $row->[1] eq 'main' ) {
+            $self->conn->dbh->do("ATTACH '$row->[2].seq' AS seq");
+            last;
+        }
     }
 
-    return $self;
 };
 
 sub create_sequence {
@@ -35,9 +27,9 @@ sub create_sequence {
     my $name = shift;
 
     if ( $self->dbd eq 'SQLite' ) {
-        $self->_sqlite_seq_dbh->do( 'CREATE TABLE sequence_' 
+        $self->conn->dbh->do( 'CREATE TABLE seq.' 
               . $name . ' ('
-              . 'seq INTEGER PRIMARY KEY, mtime TIMESTAMP )' );
+              . 'seq INTEGER PRIMARY KEY, x INTEGER )' );
     }
     elsif ( $self->dbd eq 'Pg' ) {
         $self->conn->run(
@@ -56,15 +48,11 @@ sub nextval {
     my $name = shift;
 
     if ( $self->dbd eq 'SQLite' ) {
-        $log->debug( 'INSERT INTO sequence_' 
-              . $name
-              . "(mtime) VALUES(CURRENT_TIMESTAMP)" );
+        $log->debug( 'INSERT INTO seq.' . $name . "(x) VALUES(NULL)" );
 
-        $self->_sqlite_seq_dbh->do( 'INSERT INTO sequence_' 
-              . $name
-              . '(mtime) VALUES(CURRENT_TIMESTAMP)' );
+        $self->conn->dbh->do( 'INSERT INTO seq.' . $name . '(x) VALUES(NULL)' );
 
-        return $self->_sqlite_seq_dbh->sqlite_last_insert_rowid();
+        return $self->conn->dbh->sqlite_last_insert_rowid();
     }
     elsif ( $self->dbd eq 'Pg' ) {
         $log->debug( "SELECT nextval('seq_" . $name . "')" );

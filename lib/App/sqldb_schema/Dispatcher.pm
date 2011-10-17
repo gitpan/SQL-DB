@@ -5,7 +5,7 @@ use Getopt::Long::Descriptive qw/describe_options prog_name/;
 use strict;
 use warnings;
 
-our $VERSION = '0.10';
+our $VERSION = '0.11';
 
 my $me = prog_name;
 
@@ -13,22 +13,21 @@ my $program = {
     'App::sqldb_schema' => {
         'opt_spec' => [
             [ 'username|u=s', 'DSN user name' ],
-            [ 'password=s',   'DSN password' ],
-            [ 'schema|s=s', 'SQL::DB Schema name', { 'default' => 'default' } ],
-            [ 'dbschema|d=s', 'Database Schema name' ],
-            [ 'package|p=s',  'Package name' ]
+            [ 'password|p=s', 'DSN password' ],
+            [ 'dbschema|d=s', 'Database Schema name' ]
         ],
         'arg_spec' => [
             [ 'dsn=s',     'DSN',             { 'required' => 1 } ],
+            [ 'package=s', 'Package name',    { 'required' => 1 } ],
             [ 'outfile=s', 'output filename', { 'default'  => '-' } ]
         ],
         'name'          => 'sqldb_schema',
-        'usage_desc'    => 'usage: %c [options] DSN [OUTFILE]',
+        'usage_desc'    => 'usage: %c [options] DSN PACKAGE [OUTFILE]',
         'order'         => 2147483647,
         'class'         => 'App::sqldb_schema',
         'abstract'      => 'generate a SQL::DB schema from a database',
         'require_order' => 0,
-        'getopt_conf'   => ['permute']
+        'getopt_conf'   => [ 'permute' ]
     }
 };
 
@@ -44,7 +43,8 @@ sub _commands {
 
     my $max = 4 + List::Util::max( map { length $_->{name} } @commands );
 
-    return map { sprintf( "    %-${max}s %s\n", $_->{name}, $_->{abstract} ) }
+    return
+      map { sprintf( "    %-${max}s %s\n", $_->{name}, $_->{abstract} ) }
       sort { $a->{order} <=> $b->{order} } @commands;
 }
 
@@ -204,16 +204,17 @@ __END__
 
 =head1 NAME
 
-App::sqldb_schema::Dispatch - Dispatcher for App::sqldb_schema commands
+App::sqldb_schema::Dispatcher - Dispatcher for App::sqldb_schema
+commands
 
 =head1 SYNOPSIS
 
-  use App::sqldb_schema::Dispatch;
-  App::sqldb_schema::Dispatch->run;
+  use App::sqldb_schema::Dispatcher;
+  App::sqldb_schema::Dispatcher->run;
 
 =head1 DESCRIPTION
 
-B<App::sqldb_schema::Dispatch> provides option checking, argument
+B<App::sqldb_schema::Dispatcher> provides option checking, argument
 checking, and command dispatching for commands implemented under the
 App::sqldb_schema::* namespace.
 

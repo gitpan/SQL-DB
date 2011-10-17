@@ -5,11 +5,11 @@ SQL::DB::Schema - Table and column definitions for SQL::DB
 
 =head1 VERSION
 
-0.97_3. Development release.
+0.19_8. Development release.
 
 =head1 SYNOPSIS
 
-    use SQL::DB::Schema qw/get_schema/;
+    use SQL::DB::Schema qw/load_schema/;
 
     my $schema = SQL::DB::Schema->new(name => 'myschema');
 
@@ -19,14 +19,17 @@ SQL::DB::Schema - Table and column definitions for SQL::DB
     ...
     $schema->define(@table_N_definition);
     
+    # Build INSERT expressions using irows:
+    my ($table_1, $table_3) = $schema->irow(qw/table_1, table_3/)
+
     # Build INSERT/UPDATE/DELETE expressions using urows:
-    my ($table_1, $table_3) = $schema->urow(qw/table_1, table_3)
+    my ($table_1, $table_3) = $schema->urow(qw/table_1, table_3/)
 
     # Build SELECT expressions using srows:
-    my ($table_1, $table_2) = $schema->srow(qw/table_1, table_2)
+    my ($table_1, $table_2) = $schema->srow(qw/table_1, table_2/)
 
     # Retrieve a previously elsewhere created schema:
-    my $other = get_schema('other');
+    my $other = load_schema('other');
 
 =head1 DESCRIPTION
 
@@ -42,9 +45,11 @@ A single function is exported on request:
 
 =over 4
 
-=item get_schema($name) -> SQL::DB::Schema
+=item load_schema($name) -> SQL::DB::Schema
 
-Retrieves the schema with the given $name.
+$name + '::$driver' (where $driver is a DBD driver name) must be the
+name of a class which when loaded creates a schema called $name +
+'::$driver'. See L<sqldb-schema> for how to generate such a class.
 
 =back
 
@@ -56,7 +61,7 @@ Retrieves the schema with the given $name.
 
 Create a new schema object. The 'name' attribute is required and must
 be unique. The created schema is stored in an internal hash and can be
-retrieved from other lexical scopes using the "get_schema" function.
+retrieved from other lexical scopes using the "load_schema" function.
 
 =back
 
@@ -75,12 +80,18 @@ column information is given.
 
 Returns the @tables which are not known in the schema.
 
+=item irow( $table, [ $table2 ] ) -> CODEref
+
+Returns coderefs representing $table(s). Each coderef called with
+column names returns a string suitable for an INSERT operation.  These
+coderefs can be used in L<SQL::DB>'s "do()" method (for INSERT
+queries).
+
 =item urow( $table, [ $table2 ] ) -> SQL::DB::Expr based objects
 
 Returns objects representing abstract rows from $table(s). Each object
 has a method for each column in the table. These urow objects can be
-used in L<SQL::DB>'s "do()" method (for INSERT, UPDATE or DELETE
-queries).
+used in L<SQL::DB>'s "do()" method (UPDATE or DELETE queries).
 
 =item srow( $table, [ $table2 ] ) -> SQL::DB::Expr based objects
 

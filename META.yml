@@ -1,11 +1,12 @@
 ---
-abstract: 'Perl/SQL database interface'
+abstract: 'SQL database interface for Perl'
 author:
   - 'Mark Lawrence <nomad@null.net>'
 build_requires:
   DBD::SQLite: 1.26
   ExtUtils::MakeMaker: 6.42
   File::Temp: 0
+  FindBin: 0
   Test::Database: 0
   Test::Differences: 0
   Test::More: 0
@@ -24,10 +25,12 @@ no_index:
     - t
     - xt
 requires:
+  DBI: 0
   DBIx::Connector: 0
+  Data::Dumper: 0
   File::Slurp: 0
   Log::Any: 0
-  Moo: 0
+  Moo: 0.009011
   Perl::Tidy: 0
   Sub::Exporter: 0.04
   Sub::Install: 0.04
@@ -36,4 +39,4 @@ requires:
 resources:
   license: http://opensource.org/licenses/gpl-license.php
   repository: http://github.com/mlawren/sql-db.git/
-version: 0.97_3
+version: 0.19_8

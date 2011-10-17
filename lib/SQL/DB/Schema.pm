@@ -2,18 +2,19 @@ package SQL::DB::Schema;
 use strict;
 use warnings;
 use Moo;
+use Log::Any qw/$log/;
 use Carp qw/confess/;
-use SQL::DB::Expr;
+use SQL::DB::Expr qw/_quote/;
 use Sub::Install qw/install_sub/;
 use Sub::Exporter -setup => {
-    exports => ['get_schema'],
+    exports => ['load_schema'],
     groups  => {
-        all     => ['get_schema'],
+        all     => ['load_schema'],
         default => [],
     },
 };
 
-our $VERSION = '0.97_3';
+our $VERSION = '0.19_8';
 my %schema;
 
 # Ordinals for DBI->column_info() results
@@ -60,10 +61,10 @@ sub _getglob { no strict 'refs'; \*{ $_[0] } }
 
 sub BUILD {
     my $self = shift;
-    ( my $name = $self->name ) =~ tr/a-zA-Z0-9/_/cs;
-    $self->name($name);
-    $self->_package_root( __PACKAGE__ . '::' . $name );
-    $schema{$name} = $self;
+    ( my $clean = $self->name ) =~ tr/a-zA-Z0-9/_/cs;
+    $self->_package_root( __PACKAGE__ . '::' . $clean );
+    $schema{ $self->name } = $self;
+    $log->debug( "Schema " . $self->name . " created" );
 }
 
 sub define {
@@ -109,7 +110,14 @@ sub define {
         }
         $tables->{$table}++;
 
-        my $col  = $colref->[COLUMN_NAME];
+        my $col = $colref->[COLUMN_NAME];
+
+        if ( $col eq 'new' ) {
+            confess "Column name 'new' (table/view '$table') clashes with "
+              . __PACKAGE__ . '!!!';
+        }
+
+        use bytes;
         my $type = lc $colref->[TYPE_NAME];
 
         install_sub(
@@ -117,7 +125,7 @@ sub define {
                 code => sub {
                     my $table_expr = shift;
                     SQL::DB::Expr->new(
-                        _txt   => $table_expr->_alias . '.' . $col,
+                        _txt   => [ $table_expr->_alias . '.' . $col ],
                         _btype => $type,
                     );
                 },
@@ -134,14 +142,14 @@ sub define {
                     if (@_) {
                         my $val = shift;
                         return SQL::DB::Expr->new(
-                            _txt     => $col . ' = ?',
+                            _txt     => [ $col . ' = ', _quote( $val, $type ) ],
                             _btype   => $type,
                             _bvalues => [$val],
                         );
                     }
 
                     return SQL::DB::Expr->new(
-                        _txt   => $col,
+                        _txt   => [$col],
                         _btype => $type,
                     );
                 },
@@ -160,14 +168,30 @@ sub not_known {
     return grep { !exists $tables->{$_} } @_;
 }
 
+sub irow {
+    my $self = shift;
+
+    my @ret;
+    foreach my $name (@_) {
+        if ( !exists $self->_tables->{$name} ) {
+            confess "Table not defined in schema: $name";
+        }
+        push( @ret, sub { $name . '(' . join( ',', @_ ) . ')' } );
+        return $ret[0] unless (wantarray);
+    }
+    return @ret;
+}
+
 sub srow {
     my $self = shift;
 
     my @ret;
     foreach my $name (@_) {
+        if ( !exists $self->_tables->{$name} ) {
+            confess "Table not defined in schema: $name";
+        }
         my $class = $self->_package_root . '::Srow::' . $name;
-        my $srow = eval { $class->new( _txt => $name, _alias => $name ) };
-        confess "$@\nTable not defined in schema?: $name" if $@;
+        my $srow = $class->new( _txt => [$name], _alias => $name );
         return $srow unless (wantarray);
         push( @ret, $srow );
     }
@@ -179,9 +203,11 @@ sub urow {
 
     my @ret;
     foreach my $name (@_) {
+        if ( !exists $self->_tables->{$name} ) {
+            confess "Table not defined in schema: $name";
+        }
         my $class = $self->_package_root . '::Urow::' . $name;
-        my $urow = eval { $class->new( _txt => $name ) };
-        confess "$@\nTable not defined in schema?: $name" if $@;
+        my $urow = $class->new( _txt => [$name] );
         return $urow unless (wantarray);
         push( @ret, $urow );
     }
@@ -190,10 +216,17 @@ sub urow {
 
 # Class functions
 
-sub get_schema {
+sub load_schema {
     my $name = shift;
-    return $schema{$name} if ( exists $schema{$name} );
-    return;
+    eval "require $name;";
+    if ($@) {
+        confess $@;
+    }
+    elsif ( !exists $schema{$name} ) {
+        confess "$name did not load properly";
+    }
+    $log->debug("load_schema($name) succeeded");
+    return $schema{$name};
 }
 
 1;
