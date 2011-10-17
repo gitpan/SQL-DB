@@ -7,7 +7,7 @@ use Carp qw/croak carp confess/;
 use YAML;
 use constant DEPLOY_TABLE => '_deploy';
 
-our $VERSION = '0.19_8';
+our $VERSION = '0.19_9';
 
 sub last_deploy_id {
     my $self = shift;
@@ -30,9 +30,11 @@ sub deploy {
     eval "require $class;";
     confess $@ if $@;
 
-    my $fh        = eval "\\*${class}::DATA";
-    my $start_pos = tell $fh;
-    my $yaml      = do { local $/; <$fh> };
+    my $fh = eval "\\*${class}::DATA";
+    my $start_pos = eval { tell $fh };
+    die "$class has no __DATA__ section" if $@;
+
+    my $yaml = do { local $/; <$fh> };
     seek $fh, $start_pos, 0;
 
     my $ref = Load($yaml);

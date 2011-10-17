@@ -7,7 +7,7 @@ build_requires:
   ExtUtils::MakeMaker: 6.42
   File::Temp: 0
   FindBin: 0
-  Test::Database: 0
+  Test::Database: 1.11
   Test::Differences: 0
   Test::More: 0
 configure_requires:
@@ -39,4 +39,4 @@ requires:
 resources:
   license: http://opensource.org/licenses/gpl-license.php
   repository: http://github.com/mlawren/sql-db.git/
-version: 0.19_8
+version: 0.19_9
