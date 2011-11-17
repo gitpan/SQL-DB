@@ -37,7 +37,7 @@ use overload
   fallback => 1,
   ;
 
-our $VERSION = '0.19_10';
+our $VERSION = '0.19_11';
 our $tcount  = {};
 
 has '_txt' => (
@@ -92,7 +92,7 @@ sub _as_string {
     my $self     = shift;
     my $internal = shift;
 
-    return join( '', $self->_txts );
+    return join( '', map { defined $_ ? $_ : '*UNDEF*' } $self->_txts );
 }
 
 # A true internal function - don't use outside this package
@@ -405,12 +405,10 @@ sub _bval {
 }
 
 sub _expr_join {
-    my $sep = shift;
-    return '' unless @_;
-    return $_[0] if @_ == 1;
-
+    my $sep  = shift;
     my $last = pop @_;
-    my $e    = SQL::DB::Expr->new(
+
+    my $e = SQL::DB::Expr->new(
         _txt => [
             (
                 map {

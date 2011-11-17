@@ -5,7 +5,7 @@ SQL::DB - SQL database interface for Perl
 
 =head1 VERSION
 
-0.19_10. Development release.
+0.19_11. Development release.
 
 =head1 SYNOPSIS
 
@@ -435,6 +435,10 @@ Maps to "LENGTH(@args)".
 
 Maps to "LOWER(@args)".
 
+=item sql_ltrim(@args) -> L<SQL::DB::Expr>
+
+Maps to "LTRIM(@args)".
+
 =item sql_max(@args) -> L<SQL::DB::Expr>
 
 Maps to "MAX(@args)".
@@ -443,6 +447,10 @@ Maps to "MAX(@args)".
 
 Maps to "MIN(@args)".
 
+=item sql_rtrim(@args) -> L<SQL::DB::Expr>
+
+Maps to "RTRIM(@args)".
+
 =item sql_sum(@args) -> L<SQL::DB::Expr>
 
 Maps to "MIN(@args)".
@@ -450,6 +458,10 @@ Maps to "MIN(@args)".
 =item sql_or(@args) -> L<SQL::DB::Expr>
 
 Maps to "$arg1 OR $arg2 OR ...".
+
+=item sql_replace(@args) -> L<SQL::DB::Expr>
+
+Maps to "REPLACE($arg1,$arg2 [,$arg3])".
 
 =item sql_substr(@args) -> L<SQL::DB::Expr>
 

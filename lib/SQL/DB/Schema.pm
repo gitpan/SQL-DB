@@ -14,7 +14,7 @@ use Sub::Exporter -setup => {
     },
 };
 
-our $VERSION = '0.19_10';
+our $VERSION = '0.19_11';
 my %schema;
 
 # Ordinals for DBI->column_info() results
@@ -91,7 +91,7 @@ sub define {
                 {
                     code => sub {
                         my $table_expr = shift;
-                        return '*';
+                        return $table_expr . '.*';
                     },
                     into => $urow,
                     as   => '_columns',
@@ -101,7 +101,8 @@ sub define {
                 {
                     code => sub {
                         my $table_expr = shift;
-                        return '*';
+                        return SQL::DB::Expr->new(
+                            _txt => [ $table_expr->_alias . '.*' ] );
                     },
                     into => $srow,
                     as   => '_columns',

@@ -26,9 +26,12 @@ use constant SQL_FUNCTIONS => qw/
   sql_func
   sql_length
   sql_lower
+  sql_ltrim
   sql_max
   sql_min
   sql_or
+  sql_replace
+  sql_rtrim
   sql_substr
   sql_sum
   sql_table
@@ -44,7 +47,7 @@ use Sub::Exporter -setup => {
     },
 };
 
-our $VERSION = '0.19_10';
+our $VERSION = '0.19_11';
 
 ### CLASS FUNCTIONS ###
 
@@ -77,7 +80,9 @@ sub sql_cast {
     return _expr_join( ' ', 'CAST(', $_[0], 'AS', $_[2], ')' );
 }
 
-sub sql_concat { _expr_binary( '||', $_[0], $_[1] ) }
+sub sql_concat {
+    _expr_join( ' || ', map { _quote($_) } @_ );
+}
 
 sub sql_count {
     my $e = sql_func( 'COUNT', @_ );
@@ -98,11 +103,17 @@ sub sql_length { sql_func( 'LENGTH', @_ ) }
 
 sub sql_lower { sql_func( 'LOWER', @_ ) }
 
-sub sql_or { _expr_join( ' OR ', @_ ) }
+sub sql_ltrim { sql_func( 'LTRIM', @_ ) }
 
 sub sql_max { sql_func( 'MAX', @_ ) }
 
 sub sql_min { sql_func( 'MIN', @_ ) }
+
+sub sql_or { _expr_join( ' OR ', @_ ) }
+
+sub sql_replace { sql_func( 'REPLACE', @_ ) }
+
+sub sql_rtrim { sql_func( 'RTRIM', @_ ) }
 
 sub sql_substr { sql_func( 'SUBSTR', @_ ) }
 
@@ -148,8 +159,9 @@ around BUILDARGS => sub {
         $args{schema} = load_schema($sname);
     }
     else {
-        ( my $sname = "$args{dsn}" ) =~ s/[^a-zA-Z]/_/g;
-        $args{schema} = SQL::DB::Schema->new( name => $sname );
+
+        # auto-generate the name in a semi-random way
+        $args{schema} = SQL::DB::Schema->new( name => \%args . $args{dsn} );
     }
 
     my $attr = {
@@ -376,38 +388,46 @@ sub _prepare {
                 $sth->bind_param( $i, $val, $type );
             }
 
-            return $sth;
+            return ( $query, $sth );
         },
     );
 }
 
 sub prepare {
     my $self = shift;
-    return $self->_prepare( 'prepare', @_ );
+    my ( $query, $sth ) = $self->_prepare( 'prepare', @_ );
+    return $sth;
 }
 
 sub prepare_cached {
     my $self = shift;
-    return $self->_prepare( 'prepare_cached', @_ );
+    my ( $query, $sth ) = $self->_prepare( 'prepare_cached', @_ );
+    return $sth;
 }
 
 sub sth {
     my $self = shift;
-    my $sth =
+    my ( $query, $sth ) =
         $self->cache_sth
       ? $self->_prepare( 'prepare_cached', @_ )
       : $self->_prepare( 'prepare',        @_ );
-    my $rv = $sth->execute();
+    my $rv = eval { $sth->execute() };
+    if ($@) {
+        die 'Error: ' . $query->_as_string . "\n$@";
+    }
     return $sth;
 }
 
 sub do {
     my $self = shift;
-    my $sth =
+    my ( $query, $sth ) =
         $self->cache_sth
       ? $self->_prepare( 'prepare_cached', @_ )
       : $self->_prepare( 'prepare',        @_ );
-    my $rv = $sth->execute();
+    my $rv = eval { $sth->execute() };
+    if ($@) {
+        die 'Error: ' . $query->_as_string . "\n$@";
+    }
     $log->debug( "-- Result:", $rv );
     $sth->finish();
     return $rv;
@@ -415,11 +435,14 @@ sub do {
 
 sub iter {
     my $self = shift;
-    my $sth =
+    my ( $query, $sth ) =
         $self->cache_sth
       ? $self->_prepare( 'prepare_cached', @_ )
       : $self->_prepare( 'prepare',        @_ );
-    my $rv = $sth->execute();
+    my $rv = eval { $sth->execute() };
+    if ($@) {
+        die 'Error: ' . $query->_as_string . "\n$@";
+    }
     $log->debug( "-- Result:", $rv );
     return SQL::DB::Iter->new( sth => $sth );
 }

@@ -5,7 +5,7 @@ use Moo::Role;
 use Log::Any qw/$log/;
 use Carp qw/croak carp confess/;
 
-our $VERSION = '0.19_10';
+our $VERSION = '0.19_11';
 
 after BUILD => sub {
     my $self = shift;
@@ -29,7 +29,7 @@ sub create_sequence {
     if ( $self->dbd eq 'SQLite' ) {
         $self->conn->dbh->do( 'CREATE TABLE seq.' 
               . $name . ' ('
-              . 'seq INTEGER PRIMARY KEY, x INTEGER )' );
+              . 'seq INTEGER PRIMARY KEY AUTOINCREMENT, x INTEGER )' );
 
         $self->conn->dbh->do( "
             CREATE TRIGGER seq.ai_$name AFTER INSERT ON $name

@@ -5,7 +5,7 @@ SQL::DB::Schema - Table and column definitions for SQL::DB
 
 =head1 VERSION
 
-0.19_10. Development release.
+0.19_11. Development release.
 
 =head1 SYNOPSIS
 
@@ -62,6 +62,16 @@ name of a class which when loaded creates a schema called $name +
 Create a new schema object. The 'name' attribute is required and must
 be unique. The created schema is stored in an internal hash and can be
 retrieved from other lexical scopes using the "load_schema" function.
+
+=back
+
+=head1 ATTRIBUTES
+
+=over 4
+
+=item name
+
+The name of the schema as given to the constructor.
 
 =back
 
