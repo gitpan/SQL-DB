@@ -7,7 +7,6 @@ use Cwd;
 use File::Temp qw/tempdir/;
 use SQL::DB ':all';
 use SQL::DBx::Deploy;
-use SQL::DBx::Simple;
 use FindBin;
 use lib "$FindBin::RealBin/lib";
 
@@ -56,33 +55,33 @@ foreach my $handle (@handles) {
     eval { $db->conn->dbh->do('DROP TABLE actors'); };
     eval { $db->conn->dbh->do('DROP TABLE films'); };
     eval {
-        $db->conn->dbh->do( 'DROP TABLE ' . SQL::DBx::Deploy::DEPLOY_TABLE );
+        $db->conn->dbh->do( 'DROP TABLE ' . $SQL::DBx::Deploy::DEPLOY_TABLE );
     };
     eval { $db->conn->dbh->do('DROP SEQUENCE seq_test'); };
 
     my $ret;
     my $prev_id;
 
-    $prev_id = $db->last_deploy_id('test');
+    $prev_id = $db->last_deploy_id('test::Deploy');
     is $prev_id, 0, 'Nothing deployed yet: ' . $prev_id;
 
-    $ret = $db->deploy('test');
+    $ret = $db->deploy('test::Deploy');
     is $ret, 3, 'deployed to ' . $ret;
 
-    $prev_id = $db->last_deploy_id('test');
+    $prev_id = $db->last_deploy_id('test::Deploy');
     is $prev_id, 3, 'last id check';
 
-    $ret = $db->deploy('test');
+    $ret = $db->deploy('test::Deploy');
     is $ret, 3, 'still deployed to ' . $ret;
 
-    $prev_id = $db->last_deploy_id('test');
+    $prev_id = $db->last_deploy_id('test::Deploy');
     is $prev_id, 3, 'still last id check';
 
     # This is a fake increment of the __DATA__ section
     require test::Deploy::SQLite2 if ( $dsn =~ /:SQLite:/ );
     require test::Deploy::Pg2     if ( $dsn =~ /:Pg:/ );
 
-    $ret = $db->deploy('test');
+    $ret = $db->deploy('test::Deploy');
     is $ret, 4, 'upgraded to ' . $ret;
 
     ok $db->do(
@@ -156,8 +155,6 @@ foreach my $handle (@handles) {
 
     is sql_cast( $actors->id, as => 'char' )->_as_string,
       'CAST( actors0.id AS char )', 'CAST';
-
-    # DBx::Simple
 
     ok $db->delete(
         from  => 'actors',

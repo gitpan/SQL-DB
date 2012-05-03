@@ -89,9 +89,15 @@ sub _dispatch {
     my $cmd       = 'App::sqldb_schema';
     my @ORIG_ARGV = @ARGV;
 
+    my $tmp;
+
     # Look for a subcommand
-    while ( @ARGV && exists $program->{ $cmd . '::' . $ARGV[0] } ) {
-        $cmd = $cmd . '::' . shift @ARGV;
+    while (@ARGV
+        && ( ( ( $tmp = $ARGV[0] ) =~ s/-/_/g ) || 1 )
+        && exists $program->{ $cmd . '::' . $tmp } )
+    {
+        $cmd = $cmd . '::' . $tmp;
+        shift @ARGV;
     }
 
     my ( $opt, $usage ) = describe_options(

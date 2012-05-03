@@ -8,7 +8,9 @@ if ( eval { require App::Dispatcher } ) {
 name 'SQL-DB';
 license 'GPL';
 all_from 'lib/SQL/DB.pm';
+readme_from 'lib/SQL/DB.pod';
 
+requires 'Module::Load'    => 0;
 requires 'Moo'             => '0.009011';
 requires 'Log::Any'        => 0;
 requires 'Sub::Install'    => 0.04;
@@ -19,7 +21,7 @@ test_requires 'File::Temp'        => 0;
 test_requires 'Test::More'        => 0;
 test_requires 'Test::Database'    => 1.11;
 test_requires 'Test::Differences' => 0;
-test_requires 'DBD::SQLite'       => '1.26';
+test_requires 'DBD::SQLite'       => '1.35';
 test_requires 'FindBin'           => 0;
 
 feature 'sqldb-schema',
@@ -28,7 +30,6 @@ feature 'sqldb-schema',
   'DBI'                       => 0,
   'File::Slurp'               => 0,
   'Getopt::Long::Descriptive' => 0,
-  'Perl::Tidy'                => 0,
   'Term::Prompt'              => 0,
   ;
 

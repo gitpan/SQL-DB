@@ -4,10 +4,9 @@ use warnings;
 use Term::Prompt;
 use File::Slurp qw/write_file/;
 use Data::Dumper;
-use Perl::Tidy qw/perltidy/;
 use DBI;
 
-our $VERSION = '0.19_11';
+our $VERSION = '0.19_13';
 
 sub opt_spec {
     (
@@ -54,9 +53,6 @@ sub run {
     my $output = "package $opt->{package};\n";
     $output .= "use strict;\n";
 
-    #    $output .= "use warnings;\n";
-    $output .= "require SQL::DB::Schema;\n\n";
-
     my $dbh = DBI->connect( $opt->dsn, $opt->username, $opt->password )
       || die "Could not connect: " . DBI->errstr;
 
@@ -76,8 +72,10 @@ sub run {
 
     $output .= 'my ' . Dumper \@columns;
 
-    $output .=
-      qq[\nSQL::DB::Schema->new(name => '$opt->{package}')->define(\$VAR1);\n];
+    $output .= qq[
+        sub definition { \$VAR1; }
+        sub clear { undef \$VAR1; }
+    ];
 
     my $me =
         __PACKAGE__
@@ -89,7 +87,6 @@ sub run {
     ( my $shortpkg = $opt->{package} ) =~ s/(.*)::.*/$1/;
 
     $output .= qq{
-undef \$VAR1;
 1;
 __END__
 
@@ -102,9 +99,9 @@ $opt->{package} - An SQL::DB::Schema definition
     use SQL::DB; # or anything that extends SQL::DB
 
     my \$db = SQL::DB->connect(
-        dsn      => \$dsn,
-        username => \$username,
-        password => \$password,
+        dsn      => 'dbi:$driver:...',
+        username => 'username',
+        password => 'password',
         schema   => '$shortpkg',
     );
 
@@ -130,19 +127,11 @@ option) any later version.
 =cut
 };
 
-    my $tidy;
-
-    perltidy(
-        source      => \$output,
-        destination => \$tidy,
-        perltidyrc  => '/dev/null',
-    );
-
     if ( $opt->outfile eq '-' ) {
-        print $tidy;
+        print $output;
     }
     else {
-        write_file( $opt->outfile, $tidy );
+        write_file( $opt->outfile, $output );
     }
 }
 
