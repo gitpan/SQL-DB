@@ -23,22 +23,27 @@ name: SQL-DB
 no_index:
   directory:
     - inc
+    - share
     - t
     - xt
 requires:
   DBI: 0
   DBIx::Connector: 0
   Data::Dumper: 0
+  File::Basename: 0
+  File::ShareDir: 0
   File::Slurp: 0
+  File::Spec: 0
   Getopt::Long::Descriptive: 0
   Log::Any: 0
   Module::Load: 0
   Moo: 0.009011
   Sub::Exporter: 0.04
   Sub::Install: 0.04
+  Template::Tiny: 0
   Term::Prompt: 0
   YAML: 0
 resources:
   license: http://opensource.org/licenses/gpl-license.php
   repository: http://github.com/mlawren/sql-db.git/
-version: 0.19_13
+version: 0.19_14

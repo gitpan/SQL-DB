@@ -11,6 +11,7 @@ inc/Module/Install/Makefile.pm
 inc/Module/Install/Metadata.pm
 inc/Module/Install/ReadmeFromPod.pm
 inc/Module/Install/Scripts.pm
+inc/Module/Install/Share.pm
 inc/Module/Install/Win32.pm
 inc/Module/Install/WriteAll.pm
 lib/App/sqldb_schema.pm
@@ -35,6 +36,7 @@ META.yml
 MYMETA.json
 MYMETA.yml
 README
+share/schema.tmpl
 t/04-expr.t
 t/08-schema.t
 t/10-iter.t
