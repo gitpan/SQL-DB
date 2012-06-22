@@ -16,7 +16,6 @@ inc/Module/Install/Win32.pm
 inc/Module/Install/WriteAll.pm
 lib/App/sqldb_schema.pm
 lib/App/sqldb_schema.pod
-lib/App/sqldb_schema/Dispatcher.pm
 lib/SQL/DB.pm
 lib/SQL/DB.pod
 lib/SQL/DB/Expr.pm
@@ -42,10 +41,10 @@ t/08-schema.t
 t/10-iter.t
 t/12-sequence.t
 t/14-sqlite.t
-t/lib/test/Deploy/Pg.pm
-t/lib/test/Deploy/Pg2.pm
-t/lib/test/Deploy/SQLite.pm
-t/lib/test/Deploy/SQLite2.pm
+t/deploy/Pg.yaml
+t/deploy/SQLite.yaml
+t/deploy2/Pg.yaml
+t/deploy2/SQLite.yaml
 t/lib/test/Schema/Pg.pm
 t/lib/test/Schema/SQLite.pm
 t/live.t

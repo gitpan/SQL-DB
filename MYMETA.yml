@@ -7,13 +7,14 @@ build_requires:
   ExtUtils::MakeMaker: 6.36
   File::Temp: 0
   FindBin: 0
+  Path::Class: 0
   Test::Database: 1.11
   Test::Differences: 0
   Test::More: 0
 configure_requires:
-  ExtUtils::MakeMaker: 0
+  ExtUtils::MakeMaker: 6.36
 dynamic_config: 0
-generated_by: 'ExtUtils::MakeMaker version 6.62, CPAN::Meta::Converter version 2.112150'
+generated_by: 'Module::Install version 1.06, CPAN::Meta::Converter version 2.120921'
 license: open_source
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
@@ -21,25 +22,30 @@ meta-spec:
 name: SQL-DB
 no_index:
   directory:
-    - t
     - inc
+    - share
+    - t
+    - xt
 requires:
   DBI: 0
   DBIx::Connector: 0
   Data::Dumper: 0
-  Digest::SHA1: 0
+  Digest::SHA: 0
   File::Basename: 0
-  File::ShareDir: 0
+  File::ShareDir::ProjectDistDir: 0
   File::Slurp: 0
   File::Spec: 0
   Getopt::Long::Descriptive: 0
   Log::Any: 0
   Log::Any::Adapter::Dispatch: 0
-  Module::Load: 0
   Moo: 0.009011
+  OptArgs: 0
   Sub::Exporter: 0.04
   Sub::Install: 0.04
   Template::Tiny: 0
   Term::Prompt: 0
   YAML: 0
-version: 0.19_15
+resources:
+  license: http://opensource.org/licenses/gpl-license.php
+  repository: http://github.com/mlawren/sql-db/
+version: 0.191.0_1

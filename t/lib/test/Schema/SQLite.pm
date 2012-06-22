@@ -29,7 +29,7 @@ See L<sqldb-schema>(1) for details.
 
 Generated:
 
-    date:    Thu May  3 14:15:12 2012
+    date:    Fri Jun 22 16:58:32 2012
     program: App::sqldb_schema
     source:  dbi:SQLite:dbname=/tmp/Test-Database-mark/SQLite/tdd_sqlite_mark_0
 
