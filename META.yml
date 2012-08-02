@@ -41,4 +41,4 @@ requires:
 resources:
   license: http://opensource.org/licenses/gpl-license.php
   repository: http://github.com/mlawren/sql-db/
-version: 0.971.0_1
+version: 0.971.0

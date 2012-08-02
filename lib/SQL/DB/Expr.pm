@@ -294,6 +294,15 @@ sub _sql_values_types {
                 elsif ( $type eq 'bytea' ) {
                     push( @types, { pg_type => eval 'DBD::Pg::PG_BYTEA' } );
                 }
+                elsif ( $type eq 'inet' ) {
+                    push( @types, { pg_type => eval 'DBD::Pg::PG_INET' } );
+                }
+                elsif ( $type eq 'cidr' ) {
+                    push( @types, { pg_type => eval 'DBD::Pg::PG_CIDR' } );
+                }
+                elsif ( $type eq 'boolean' ) {
+                    push( @types, { pg_type => eval 'DBD::Pg::PG_BOOL' } );
+                }
                 else {
                     warn "No mapping for type $type";
                     push( @types, undef );
@@ -304,10 +313,7 @@ sub _sql_values_types {
                 # leave it undefined
             }
             else {
-                warn "No bind type for $val";
-                push( @values, $val );
-                push( @types,  undef );
-                $sql .= '?';
+                $sql .= $dbh->quote($val);
             }
         }
         elsif ( !defined $token ) {
@@ -555,14 +561,11 @@ sub as {
     if ( $e1->_multi > 0 ) {
         my $expr = SQL::DB::Expr->new( _txt => ['('] );
         $expr .= $e1;
-        $expr .= ') AS ';
-        $expr .= _quote($as);
+        $expr .= ') AS "' . $as . '"';
         return $expr;
     }
 
-    my $expr = $e1 . ' AS ';
-    $expr .= _quote($as);
-    return $expr;
+    return $e1 . ' AS "' . $as . '"';
 }
 
 sub like {

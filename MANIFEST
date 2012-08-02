@@ -22,6 +22,8 @@ lib/SQL/DB/Schema.pm
 lib/SQL/DB/Schema.pod
 lib/SQL/DBx/Deploy.pm
 lib/SQL/DBx/Deploy.pod
+lib/SQL/DBx/Pg.pm
+lib/SQL/DBx/Pg.pod
 lib/SQL/DBx/SQLite.pm
 lib/SQL/DBx/SQLite.pod
 lib/Test/SQL/DB.pm
